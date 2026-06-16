@@ -3,7 +3,7 @@ import { Workout } from "../types";
 export const mockWorkouts: Workout[] = [
   {
     id: 1,
-    name: "Strength Training",
+    name: "Pull",
     date: "2026-06-10",
     durationMinutes: 53,
     exercises: [
