@@ -45,21 +45,24 @@ export default function WorkoutListScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#fff",
     padding: 16,
   },
   row: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
+    borderBottomColor: "#eee",
   },
   nameText: {
     fontSize: 18,
   },
   dateText: {
     fontSize: 14,
+    color: "#555",
   },
   timeText: {
     fontSize: 12,
+    color: "#555",
   },
   emptyText: {
     textAlign: "center",
