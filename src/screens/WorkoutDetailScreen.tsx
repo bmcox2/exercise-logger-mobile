@@ -1,13 +1,23 @@
 import { View, Text, ScrollView, StyleSheet } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../types";
-import { mockWorkouts } from "../data/mockData";
+import { useState, useEffect } from "react";
+
+import { RootStackParamList, Workout } from "../types";
+import { getWorkoutById } from "../db/database";
 
 type Props = NativeStackScreenProps<RootStackParamList, "WorkoutDetail">;
 
 export default function WorkoutDetailScreen({ route }: Props) {
+  const [workout, setWorkout] = useState<Workout | null>();
   const { workoutId } = route.params;
-  const workout = mockWorkouts.find((w) => w.id === workoutId);
+
+  useEffect(() => {
+    async function load() {
+      const data = await getWorkoutById(workoutId);
+      setWorkout(data);
+    }
+    load();
+  }, []);
 
   if (!workout) {
     return (

@@ -1,16 +1,35 @@
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View, Pressable, TextInput } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import WorkoutListScreen from "./src/screens/WorkoutListScreen";
 import WorkoutDetailScreen from "./src/screens/WorkoutDetailScreen";
 import { RootStackParamList } from "./src/types";
+import { initDatabase } from "./src/db/database";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
+  const [dbReady, setDbReady] = useState(false);
+
+  useEffect(() => {
+    async function init() {
+      await initDatabase();
+      setDbReady(true);
+    }
+    init();
+  }, []);
+
+  if (!dbReady) {
+    return (
+      <View style={styles.container}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="WorkoutList">

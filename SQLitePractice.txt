@@ -1,0 +1,68 @@
+Module 1:
+
+CREATE TABLE exercises (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    reps INTEGER,
+    weight REAL
+    primaryMuscles ? (probably a pointer of sorts)
+    secondaryMuscles ?
+);
+
+1. Since the arrays inside the table are dynamic, you would want to store them elsewhere to make continuous memory easier, so you need a new table for each array and probably just store a pointer to said table. 
+2. A primary key is used to identify a row, so no two rows can have the same key. 
+3. SQL stores data like a spreadsheet where is columb describes the type of data being stored, and eacn row is the actual data stored. Each row has a primary key which can be automatically assigned by the SQL and allows the table to be organized. 
+
+
+Module 2:
+
+INSERT INTO workouts (name, date, durationMinutes) VALUES ('Leg Day', '2026-06-12', 65);
+
+SELECT name, durationMinutes FROM workouts;
+
+SELECT * FROM workouts WHERE id = 3;
+
+SELECT * FROM workouts ORDER BY date ASC;
+
+1. Create - INSERT, Read - SELECT, Update - UPDATE, Delete - Delete
+2. We are letting the SQL table auto increment the ID, so we don't have to worry about it.
+3. Filtering in the database is much quicker with large databases compared ot loading it into JS and then filtering. 
+
+
+Module 3:
+
+CREATE TABLE workouts (
+    id INTERGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    date TEXT NOT NULL,
+    durationMinutes INTEGER
+);
+
+CREATE TABLE exercises (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  workout_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  reps INTEGER,
+  weight REAL,
+  FOREIGN KEY (workout_id) REFERENCES workouts(id)
+);
+
+CREATE TABLE primary_muscles (
+  exercise_id INTEGER NOT NULL,
+  muscle TEXT NOT NULL,
+  FOREIGN KEY (exercise_id) REFERENCES exercises(id)
+);
+
+CREATE TABLE secondary_muscles (
+  exercise_id INTEGER NOT NULL,
+  muscle TEXT NOT NULL,
+  FOREIGN KEY (exercise_id) REFERENCES exercises(id)
+);
+
+The foreign key is that table saying it actually belongs to another table, so put me there, which is the same thing as having a nested array.
+
+SELECT * FROM exercises where workout_id = 2;
+
+1. A foreign key is a value that relates/points to the primary key of another table. It is a pointer, but in the other direction to what I thought earlier.
+2. Similiar thinking to the answer from Module 1. Also you can only store 1 piece of data per row, so an array would not work.
+3. Because it is simplier, and you do not want to overcomplicate it, but I'd rather do it the correct way and save time.

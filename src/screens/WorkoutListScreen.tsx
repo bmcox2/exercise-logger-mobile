@@ -1,16 +1,26 @@
 import { View, Text, Pressable, FlatList, StyleSheet } from "react-native";
-
+import { useState, useEffect } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../types";
-import { mockWorkouts } from "../data/mockData";
+
+import { RootStackParamList, Workout } from "../types";
+import { getWorkouts } from "../db/database";
 
 type Props = NativeStackScreenProps<RootStackParamList, "WorkoutList">;
 
 export default function WorkoutListScreen({ navigation }: Props) {
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+
+  useEffect(() => {
+    async function load() {
+      const data = await getWorkouts();
+      setWorkouts(data);
+    }
+    load();
+  }, []);
   return (
     <View style={styles.container}>
       <FlatList
-        data={mockWorkouts}
+        data={workouts}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
           <Pressable
