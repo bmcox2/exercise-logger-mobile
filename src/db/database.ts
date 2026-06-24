@@ -1,12 +1,12 @@
 import * as SQLite from "expo-sqlite";
-import { Workout, Exercise } from "../types";
+import { Workout, Exercise, WorkoutSet } from "../types";
 
 import { mockWorkouts } from "../data/mockData";
 
 let db: SQLite.SQLiteDatabase;
 
 export async function initDatabase() {
-  db = await SQLite.openDatabaseAsync("workouts.db");
+  db = await SQLite.openDatabaseAsync("workouts_v2.db");
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,9 +19,16 @@ export async function initDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         workout_id INTEGER NOT NULL,
         name TEXT NOT NULL,
-        reps INTEGER,
-        weight REAL,
         FOREIGN KEY (workout_id) REFERENCES workouts(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS sets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        exercise_id INTEGER NOT NULL,
+        setNumber INTEGER NOT NULL,
+        reps INTEGER NOT NULL,
+        weight REAL NOT NULL,
+        FOREIGN KEY (exercise_id) REFERENCES exercises(id)
     );
 
     CREATE TABLE IF NOT EXISTS primaryMuscles (
@@ -54,6 +61,13 @@ async function getMuscles(
   return rows.map((row) => row.muscle);
 }
 
+async function getSetsForExercise(exerciseId: number): Promise<WorkoutSet[]> {
+  return db.getAllAsync<WorkoutSet>(
+    "SELECT * FROM sets WHERE exercise_id = ? ORDER BY setNumber ASC",
+    exerciseId,
+  );
+}
+
 async function getExercisesForWorkout(workoutId: number): Promise<Exercise[]> {
   const exerciseRows = await db.getAllAsync<Exercise>(
     "SELECT * FROM exercises WHERE workout_id = ?",
@@ -64,7 +78,8 @@ async function getExercisesForWorkout(workoutId: number): Promise<Exercise[]> {
   for (const ex of exerciseRows) {
     const primaryMuscles = await getMuscles("primaryMuscles", ex.id);
     const secondaryMuscles = await getMuscles("secondaryMuscles", ex.id);
-    exercises.push({ ...ex, primaryMuscles, secondaryMuscles } as Exercise);
+    const sets = await getSetsForExercise(ex.id);
+    exercises.push({ ...ex, primaryMuscles, secondaryMuscles, sets });
   }
   return exercises;
 }
@@ -81,38 +96,48 @@ export async function getWorkoutById(id: number): Promise<Workout | null> {
 }
 
 export async function addWorkout(workout: Workout): Promise<void> {
-  const workoutResult = await db.runAsync(
-    "INSERT INTO workouts (name, date, durationMinutes) VALUES (?, ?, ?)",
-    workout.name,
-    workout.date,
-    workout.durationMinutes,
-  );
-  const workoutId = workoutResult.lastInsertRowId;
-
-  for (const exercise of workout.exercises) {
-    const exerciseResult = await db.runAsync(
-      "INSERT INTO exercises (workout_id, name, reps, weight) VALUES (?, ?, ?, ?)",
-      workoutId,
-      exercise.name,
-      exercise.reps,
-      exercise.weight,
+  await db.withTransactionAsync(async () => {
+    const workoutResult = await db.runAsync(
+      "INSERT INTO workouts (name, date, durationMinutes) VALUES (?, ?, ?)",
+      workout.name,
+      workout.date,
+      workout.durationMinutes,
     );
-    const exerciseId = exerciseResult.lastInsertRowId;
-    for (const muscle of exercise.primaryMuscles) {
-      await db.runAsync(
-        "INSERT INTO primaryMuscles (exercise_id, muscle) VALUES (?, ?)",
-        exerciseId,
-        muscle,
+    const workoutId = workoutResult.lastInsertRowId;
+
+    for (const exercise of workout.exercises) {
+      const exerciseResult = await db.runAsync(
+        "INSERT INTO exercises (workout_id, name) VALUES (?, ?)",
+        workoutId,
+        exercise.name,
       );
+      const exerciseId = exerciseResult.lastInsertRowId;
+
+      for (const muscle of exercise.primaryMuscles) {
+        await db.runAsync(
+          "INSERT INTO primaryMuscles (exercise_id, muscle) VALUES (?, ?)",
+          exerciseId,
+          muscle,
+        );
+      }
+      for (const muscle of exercise.secondaryMuscles) {
+        await db.runAsync(
+          "INSERT INTO secondaryMuscles (exercise_id, muscle) VALUES (?, ?)",
+          exerciseId,
+          muscle,
+        );
+      }
+      for (const set of exercise.sets) {
+        await db.runAsync(
+          "INSERT INTO sets (exercise_id, setNumber, reps, weight) VALUES (?, ?, ?, ?)",
+          exerciseId,
+          set.setNumber,
+          set.reps,
+          set.weight,
+        );
+      }
     }
-    for (const muscle of exercise.secondaryMuscles) {
-      await db.runAsync(
-        "INSERT INTO secondaryMuscles (exercise_id, muscle) VALUES (?, ?)",
-        exerciseId,
-        muscle,
-      );
-    }
-  }
+  });
 }
 
 async function seedDatabase() {

@@ -1,8 +1,14 @@
+export interface WorkoutSet {
+  id: number;
+  setNumber: number;
+  reps: number;
+  weight: number;
+}
+
 export interface Exercise {
   id: number;
   name: string;
-  reps: number;
-  weight: number;
+  sets: WorkoutSet[];
   primaryMuscles: string[];
   secondaryMuscles: string[];
 }

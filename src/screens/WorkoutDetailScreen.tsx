@@ -39,9 +39,6 @@ export default function WorkoutDetailScreen({ route }: Props) {
         <Text style={[styles.cell, styles.cellNum, styles.headerText]}>
           Set
         </Text>
-        <Text style={[styles.cell, styles.cellName, styles.headerText]}>
-          Exercise
-        </Text>
         <Text style={[styles.cell, styles.cellStat, styles.headerText]}>
           Reps
         </Text>
@@ -50,17 +47,23 @@ export default function WorkoutDetailScreen({ route }: Props) {
         </Text>
       </View>
 
-      {workout.exercises.map((exercise, index) => (
-        <View
-          key={exercise.id}
-          style={[styles.row, index % 2 === 1 && styles.rowAlt]}
-        >
-          <Text style={[styles.cell, styles.cellNum]}>{index + 1}</Text>
-          <Text style={[styles.cell, styles.cellName]}>{exercise.name}</Text>
-          <Text style={[styles.cell, styles.cellStat]}>{exercise.reps}</Text>
-          <Text style={[styles.cell, styles.cellStat]}>
-            {exercise.weight} lbs
-          </Text>
+      {workout.exercises.map((exercise) => (
+        <View key={exercise.id}>
+          <View style={styles.exerciseHeader}>
+            <Text style={styles.exerciseName}>{exercise.name}</Text>
+          </View>
+          {exercise.sets.map((set, index) => (
+            <View
+              key={set.id}
+              style={[styles.row, index % 2 === 1 && styles.rowAlt]}
+            >
+              <Text style={[styles.cell, styles.cellNum]}>{set.setNumber}</Text>
+              <Text style={[styles.cell, styles.cellStat]}>{set.reps}</Text>
+              <Text style={[styles.cell, styles.cellStat]}>
+                {set.weight} lbs
+              </Text>
+            </View>
+          ))}
         </View>
       ))}
     </ScrollView>
@@ -95,6 +98,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
   },
+  exerciseHeader: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginTop: 4,
+    backgroundColor: "#e8e8e8",
+  },
+  exerciseName: {
+    fontWeight: "bold",
+    fontSize: 14,
+  },
   row: {
     flexDirection: "row",
     paddingVertical: 8,
@@ -113,9 +126,6 @@ const styles = StyleSheet.create({
   },
   cellNum: {
     flex: 1,
-  },
-  cellName: {
-    flex: 5,
   },
   cellStat: {
     flex: 2,
