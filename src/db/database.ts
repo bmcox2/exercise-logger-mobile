@@ -1,7 +1,15 @@
 import * as SQLite from "expo-sqlite";
-import { Workout, Exercise, WorkoutSet } from "../types";
+import {
+  Workout,
+  Exercise,
+  WorkoutSet,
+  ExerciseLibraryItem,
+  ExerciseLibraryRow,
+} from "../types";
 
 import { mockWorkouts } from "../data/mockData";
+
+import exerciseData from "../../assets/exercises.json";
 
 let db: SQLite.SQLiteDatabase;
 
@@ -41,6 +49,26 @@ export async function initDatabase() {
         exercise_id INTEGER NOT NULL,
         muscle TEXT NOT NULL,
         FOREIGN KEY (exercise_id) REFERENCES exercises(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS exerciseLibrary (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        equipment TEXT,
+        category TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS libraryPrimaryMuscles (
+        exercise_library_id INTEGER NOT NULL,
+        muscle TEXT NOT NULL,
+        FOREIGN KEY (exercise_library_id) REFERENCES exerciseLibrary(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS librarySecondaryMuscles (
+        exercise_library_id INTEGER NOT NULL,
+        muscle TEXT NOT NULL,
+        FOREIGN KEY (exercise_library_id) REFERENCES exerciseLibrary(id)
     );
 `);
   await seedDatabase();
@@ -95,7 +123,7 @@ export async function getWorkoutById(id: number): Promise<Workout | null> {
   return { ...workout, exercises } as Workout;
 }
 
-export async function addWorkout(workout: Workout): Promise<void> {
+async function addWorkout(workout: Workout): Promise<void> {
   await db.withTransactionAsync(async () => {
     const workoutResult = await db.runAsync(
       "INSERT INTO workouts (name, date, durationMinutes) VALUES (?, ?, ?)",
@@ -140,11 +168,82 @@ export async function addWorkout(workout: Workout): Promise<void> {
   });
 }
 
+async function addExerciseData(exercise: ExerciseLibraryItem): Promise<void> {
+  const result = await db.runAsync(
+    "INSERT INTO exerciseLibrary (name, description, equipment, category) VALUES (?, ?, ?, ?)",
+    exercise.name,
+    exercise.instructions.join(" "),
+    exercise.equipment,
+    exercise.category,
+  );
+  const exerciseId = result.lastInsertRowId;
+
+  for (const muscle of exercise.primaryMuscles) {
+    await db.runAsync(
+      "INSERT INTO libraryPrimaryMuscles (exercise_library_id, muscle) VALUES (?, ?)",
+      exerciseId,
+      muscle,
+    );
+  }
+  for (const muscle of exercise.secondaryMuscles) {
+    await db.runAsync(
+      "INSERT INTO librarySecondaryMuscles (exercise_library_id, muscle) VALUES (?, ?)",
+      exerciseId,
+      muscle,
+    );
+  }
+}
+
 async function seedDatabase() {
-  const existing = await db.getAllAsync("SELECT * FROM workouts");
-  if (existing.length === 0) {
+  const existingWorkouts = await db.getAllAsync("SELECT * FROM workouts");
+  if (existingWorkouts.length === 0) {
     for (const workout of mockWorkouts) {
       await addWorkout(workout);
     }
   }
+
+  const existingExerciseLibrary = await db.getAllAsync(
+    "SELECT * FROM exerciseLibrary",
+  );
+  if (existingExerciseLibrary.length === 0) {
+    await db.withTransactionAsync(async () => {
+      for (const exercise of exerciseData) {
+        await addExerciseData(exercise);
+      }
+    });
+  }
+}
+
+export async function searchExerciseLibraryByName(
+  input: string,
+): Promise<ExerciseLibraryRow[]> {
+  const results = await db.getAllAsync<ExerciseLibraryRow>(
+    "SELECT * FROM exerciseLibrary WHERE LOWER(name) LIKE LOWER(?)",
+    `%${input}%`,
+  );
+  const ids = results.map((exercise) => exercise.id);
+  if (ids.length === 0) return [];
+
+  const placeholders = ids.map(() => "?").join(", ");
+  const primaryQuery = `SELECT * FROM libraryPrimaryMuscles WHERE exercise_library_id IN (${placeholders})`;
+  const secondaryQuery = `SELECT * FROM librarySecondaryMuscles WHERE exercise_library_id IN (${placeholders})`;
+  const primaryMuscles = await db.getAllAsync<{
+    exercise_library_id: number;
+    muscle: string;
+  }>(primaryQuery, ...ids);
+  const secondaryMuscles = await db.getAllAsync<{
+    exercise_library_id: number;
+    muscle: string;
+  }>(secondaryQuery, ...ids);
+
+  for (const exercise of results) {
+    exercise.primaryMuscles = primaryMuscles
+      .filter((muscle) => muscle.exercise_library_id === exercise.id)
+      .map((muscle) => muscle.muscle);
+    exercise.secondaryMuscles = secondaryMuscles
+      .filter((muscle) => muscle.exercise_library_id === exercise.id)
+      .map((muscle) => muscle.muscle);
+  }
+
+  return results;
 }

@@ -509,3 +509,4 @@ Same shape as V3's Phase 6.
   screen remain deferred (see Backlog) — now better motivated once V4's sets
   schema lands, since per-set data is more accurate than per-exercise
   totals.
+- (New, V4 Phase 1) Exercise library seed runs 873 individual inserts sequentially on first launch, causing ~30 second delay. One-time cost only — subsequent launches skip the seed entirely. Fix with bulk inserts or seed during account setup if first-launch experience ever matters (e.g. before sharing the app with others).

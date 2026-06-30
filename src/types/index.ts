@@ -25,3 +25,22 @@ export type RootStackParamList = {
   WorkoutList: undefined;
   WorkoutDetail: { workoutId: number };
 };
+
+export interface ExerciseLibraryItem {
+  name: string;
+  instructions: string[];
+  equipment: string | null;
+  category: string | null;
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+}
+
+export interface ExerciseLibraryRow {
+  id: number;
+  name: string;
+  description: string;
+  equipment: string | null;
+  category: string | null;
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+}
