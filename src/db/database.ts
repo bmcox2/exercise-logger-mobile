@@ -80,11 +80,12 @@ export async function getWorkouts(): Promise<Workout[]> {
 
 async function getMuscles(
   table: string,
-  exerciseId: number,
+  column: string,
+  id: number,
 ): Promise<string[]> {
   const rows = await db.getAllAsync<{ muscle: string }>(
-    `SELECT * FROM ${table} WHERE exercise_id = ?`,
-    exerciseId,
+    `SELECT * FROM ${table} WHERE ${column} = ?`,
+    id,
   );
   return rows.map((row) => row.muscle);
 }
@@ -104,8 +105,16 @@ async function getExercisesForWorkout(workoutId: number): Promise<Exercise[]> {
 
   const exercises: Exercise[] = [];
   for (const ex of exerciseRows) {
-    const primaryMuscles = await getMuscles("primaryMuscles", ex.id);
-    const secondaryMuscles = await getMuscles("secondaryMuscles", ex.id);
+    const primaryMuscles = await getMuscles(
+      "primaryMuscles",
+      "exercise_id",
+      ex.id,
+    );
+    const secondaryMuscles = await getMuscles(
+      "secondaryMuscles",
+      "exercise_id",
+      ex.id,
+    );
     const sets = await getSetsForExercise(ex.id);
     exercises.push({ ...ex, primaryMuscles, secondaryMuscles, sets });
   }
@@ -246,4 +255,30 @@ export async function searchExerciseLibraryByName(
   }
 
   return results;
+}
+
+export async function getExerciseById(
+  id: number,
+): Promise<ExerciseLibraryRow | null> {
+  const exercise = await db.getFirstAsync<ExerciseLibraryRow>(
+    "SELECT * FROM ExerciseLibrary WHERE id = ?",
+    id,
+  );
+  if (exercise === null) return null;
+
+  const primaryMuscles = await getMuscles(
+    "libraryPrimaryMuscles",
+    "exercise_library_id",
+    id,
+  );
+  const secondaryMuscles = await getMuscles(
+    "librarySecondaryMuscles",
+    "exercise_library_id",
+    id,
+  );
+  return {
+    ...exercise,
+    primaryMuscles,
+    secondaryMuscles,
+  } as ExerciseLibraryRow;
 }

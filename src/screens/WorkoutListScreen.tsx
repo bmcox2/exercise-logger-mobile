@@ -2,10 +2,10 @@ import { View, Text, Pressable, FlatList, StyleSheet } from "react-native";
 import { useState, useEffect } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
-import { RootStackParamList, Workout } from "../types";
+import { WorkoutsStackParamList, Workout } from "../types";
 import { getWorkouts } from "../db/database";
 
-type Props = NativeStackScreenProps<RootStackParamList, "WorkoutList">;
+type Props = NativeStackScreenProps<WorkoutsStackParamList, "WorkoutList">;
 
 export default function WorkoutListScreen({ navigation }: Props) {
   const [workouts, setWorkouts] = useState<Workout[]>([]);

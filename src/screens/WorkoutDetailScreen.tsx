@@ -2,10 +2,10 @@ import { View, Text, ScrollView, StyleSheet } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useState, useEffect } from "react";
 
-import { RootStackParamList, Workout } from "../types";
+import { WorkoutsStackParamList, Workout } from "../types";
 import { getWorkoutById } from "../db/database";
 
-type Props = NativeStackScreenProps<RootStackParamList, "WorkoutDetail">;
+type Props = NativeStackScreenProps<WorkoutsStackParamList, "WorkoutDetail">;
 
 export default function WorkoutDetailScreen({ route }: Props) {
   const [workout, setWorkout] = useState<Workout | null>();

@@ -21,9 +21,14 @@ export interface Workout {
   exercises: Exercise[];
 }
 
-export type RootStackParamList = {
+export type WorkoutsStackParamList = {
   WorkoutList: undefined;
   WorkoutDetail: { workoutId: number };
+};
+
+export type LibraryStackParamList = {
+  ExerciseLibrary: undefined;
+  ExerciseDetail: { exerciseId: number };
 };
 
 export interface ExerciseLibraryItem {

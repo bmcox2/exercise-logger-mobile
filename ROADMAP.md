@@ -417,7 +417,24 @@ well.
 
 Done when: I can add and edit a short note on a workout, and it persists.
 
-#### Phase 6 — Polish and document
+#### Phase 6 — Filter the exercise library
+
+Currently search is name-only. The library schema already includes `equipment`
+and `category` columns, and `libraryPrimaryMuscles` / `librarySecondaryMuscles`
+support muscle-based filtering.
+
+- Add filter controls to the library browse and exercise picker screens
+  (equipment, category, primary muscle — most useful for workout building)
+- Extend `searchExerciseLibraryByName` or add a new `searchExercises` function
+  that accepts optional filter parameters and builds the WHERE clause dynamically
+- Consider trimming the 873-exercise dataset to exercises actually relevant
+  before adding filters, since the full dataset includes
+  stretching, cardio, strongman, and olympic lifting that may not be useful
+
+Done when: I can filter the exercise list by equipment, category, or muscle
+group in addition to searching by name.
+
+#### Phase 7 — Polish and document
 
 Same shape as V3's Phase 6.
 
