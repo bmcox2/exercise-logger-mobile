@@ -14,7 +14,7 @@ import exerciseData from "../../assets/exercises.json";
 let db: SQLite.SQLiteDatabase;
 
 export async function initDatabase() {
-  db = await SQLite.openDatabaseAsync("workouts_v2.db");
+  db = await SQLite.openDatabaseAsync("workouts_v3.db");
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

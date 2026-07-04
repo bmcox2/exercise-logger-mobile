@@ -256,228 +256,242 @@ deferred deliberately, not abandoned.
 
 ### Goal
 
-Make the app something I actually use at the gym. By the end of V4, I can
-build a workout ahead of time using a real exercise library, follow it during
-a workout with the ability to adjust reps/weight/exercises/sets live as I go,
-and edit or delete past workouts afterward. This is the version where the app
-stops being a viewer and becomes a tool.
+Make the app something I actually use at the gym. By the end of V4, I can plan
+a workout by starting from one of my past workouts as a template, adjust the
+sets/reps/weight, and follow it during a session with the ability to edit live
+as I go. AI workout generation — the way I actually want to build workouts
+long-term — has a designed, visible place to plug in, but is not implemented
+until V5. This is the version where the app stops being a viewer and becomes a
+tool.
 
 ### Why this scope, and what changed during planning
 
-The original V4 scope (add/edit/delete, notes, in-workout experience) is
-still the right destination, but two things became clear during planning that
-reshape it:
+The original V4 plan treated manual workout building as the foundation and AI
+as a later garnish. Thinking it through properly, that's backwards for the app
+I actually want. My real intent is: I type something like "build a leg workout
+for today, dial back volume because I've got something tomorrow," and AI
+assembles a full plan — exercises and sets/reps/weight — using my past workouts
+as context, which I then adjust. In that vision **AI is the primary way I build
+a workout, and manual building is a rarely-touched fallback.** Spending my best
+effort polishing a manual builder first would mean investing in the part I care
+least about.
 
-1. **The data model needs to change first.** The current `Exercise` type
-   holds one reps/weight pair. Real workouts have multiple sets per exercise
-   (e.g. Bench Press: 135x10, 145x8, 155x6), matching how Garmin and Volt both
-   model it. Retrofitting this after building screens on the old shape would
-   mean redoing UI work, so the schema change comes first, as its own phase.
-2. **An exercise library is a prerequisite, not a nice-to-have.** Building a
-   workout means picking exercises. Without a library, every workout build
-   means typing exercise names from scratch — error-prone and disconnected
-   from the muscle-group data the app already cares about. This mirrors the
-   `ExerciseDatabase` / `ExerciseInfo` work already done in the C++ version,
-   re-expressed here.
+The principle that resolves this is one I've already been using all through V4:
+**the `Workout` data structure is the contract.** `addWorkout` doesn't care how
+a workout was assembled — a human tapping it together, AI generating it, or
+cloning a past workout as a template all produce the same `Workout` object, and
+all feed the same place. So the piece worth building is the shared destination
+those producers feed: an **editing surface** that takes a `Workout` in a
+"being edited" state, lets me adjust it, and saves it. That surface is needed no
+matter what, and it survives AI integration untouched.
 
-**Real usage pattern motivating this version:** workouts are currently
-planned in a conversation with Claude (using past workout history), followed
-on a Garmin watch during the session — with live deviation as the workout
-actually happens — then reported back afterward. V4's in-workout screen is
-modeled on this real pattern (plan first, adjust live) rather than a build-as
--you-go model, and is directly inspired by the tap-to-edit interaction in the
-Volt app: see a planned exercise, weight, and reps; tap any value to overwrite
-it with what actually happened.
+What this reorders:
 
-Notes are deferred in spirit to V5 (alongside AI integration) but a
-lightweight free-text field is cheap enough to include at the end of V4 if
-time allows.
+1. **The editing surface is the spine of Phase 2**, not the manual builder. It's
+   fed first by cloning a past workout (needs no AI, and is genuinely how I'd
+   start most sessions).
+2. **AI is stubbed visually in V4, built for real in V5.** The reason to stub
+   rather than build now isn't that the jump gets smaller by waiting — it
+   doesn't. It's about isolating variables: when AI breaks (repeatedly, while
+   I'm learning it), I want the editing surface already proven, so every bug is
+   by definition in the AI layer. Stubbing also forces me to design the _seam_
+   now while it's cheap — where AI plugs in and what it hands off — so V5 is
+   "make the stub real," not "figure out where AI even goes."
+3. **Manual from-scratch building is demoted** to a later, optional phase — just
+   another producer feeding the same surface, never a blocker.
 
-**Timeline context:** roughly six weeks of dedicated time are available
-before returning to school, after which time for the project will shrink
-considerably. The full original roadmap (V4 → V5 → V6) remains the goal, at
-roughly two weeks per version, matching the pace V1 → V3 was actually built
-at. A deliberate checkpoint is planned after V4: if V4 takes
-meaningfully longer than two weeks, V5/V6 scope should be reassessed before
-committing further time, particularly V6, which depends on still-unresearched
-Garmin API constraints.
+The one rule that makes "now vs. later" not matter for rework: the AI producer
+and the editing surface must communicate _only_ through the `Workout` data
+structure. Keep that seam clean and AI can slot in whenever.
+
+Note: this roadmap is deliberately malleable. AI drafted it as guidance; the
+real design decisions get made when I reach each phase, because I didn't have a
+perfect picture when writing it and my ideas may still change.
 
 ### V4 broken into phases
 
-#### Phase 0 — Evolve the schema: sets
+#### Phase 0 — Evolve the schema: sets ✅ Complete
 
-Before any new screens, change the data model to support multiple sets per
-exercise.
+- `sets` table (`id`, `exercise_id`, `setNumber`, `reps`, `weight`)
+- `Exercise` type updated: removed top-level `reps`/`weight`, added
+  `sets: WorkoutSet[]`
+- `addWorkout` inserts one row per set, wrapped in `db.withTransactionAsync`
+  so a partial workout can never be written on failure
+- `WorkoutDetailScreen` renders one row per set; `key` uses `set.id`
+- Reseeded via `workouts_v2.db`
 
-- Design and create a `sets` table: `id`, `exercise_id` (foreign key →
-  `exercises`), `reps`, `weight`, and a `setNumber`/order column so sets
-  display in the right sequence
-- Update the `Exercise` TypeScript type: remove top-level `reps`/`weight`,
-  add `sets: Set[]`
-- Update `database.ts`: `addWorkout` now inserts one row per set per
-  exercise instead of one reps/weight pair; `getWorkoutById`'s exercise
-  assembly fetches and attaches sets the same way it currently attaches
-  muscles
-- Wipe the existing SQLite database (delete/reinstall, same approach as V3
-  Phase 5) and reseed
-- Rewrite `mockData.ts` with realistic multi-set exercises so the seed data
-  actually demonstrates the new shape
-- Update `WorkoutDetailScreen`'s table to render one row per set, not one row
-  per exercise (exercise name shown once, sets listed beneath or grouped)
+Done when: a workout with 3 distinct sets displays correctly and persists
+through an app restart. ✅ Confirmed on device.
 
-Done when: a workout with an exercise that has 3 distinct sets displays
-correctly on the detail screen, and that shape persists correctly through an
-app restart.
+#### Phase 1 — Build the exercise library ✅ Complete
 
-#### Phase 1 — Build the exercise library
+- `exerciseLibrary` table (`id`, `name`, `description`, `equipment`,
+  `category`) plus `libraryPrimaryMuscles` / `librarySecondaryMuscles` junction
+  tables, mirroring the workout-side muscle pattern
+- Seeded from the free-exercise-db dataset (873 exercises), transformed from
+  JSON on first launch inside a single transaction
+- Two TypeScript interfaces: `ExerciseLibraryItem` (JSON input shape) and
+  `ExerciseLibraryRow` (database output shape) — separated because input and
+  output genuinely diverge
+- `searchExerciseLibraryByName` — case-insensitive partial match, uses a
+  batched `IN (...)` query for muscles to avoid N+1 scaling on list results
+- `getExerciseById` for the detail screen; `getMuscles` generalized to take a
+  column name so it serves both workout and library junction tables
+- Navigation restructured to a bottom tab navigator with two nested stacks
+  (`WorkoutsStackParamList`, `LibraryStackParamList`)
+- `ExerciseLibraryScreen` (search + live-filtering list) and
+  `ExerciseDetailScreen` (name, category, equipment, description, muscles)
 
-Before building a workout, there needs to be something to choose from.
+Done when: I can open a screen, search an exercise by name, and see it in a
+results list with its muscle groups. ✅ Confirmed on device.
 
-- Design an `exercise_library` table — distinct from the `exercises` table
-  (which represents an exercise _as logged inside a specific workout_). The
-  library is the catalog: name, default primary/secondary muscle groups. This
-  mirrors the C++ `ExerciseInfo` / `ExerciseDatabase` split between exercise
-  _definitions_ and exercise _instances in a workout_
-- Seed the library — likely reusing the same free-exercise-db dataset (or a
-  trimmed version of it) used in the C++ version, or starting with just the
-  exercises that already appear in the real seeded workouts and expanding
-  later (open question, decide when starting this phase)
-- Build a simple library browse/search screen: list exercises, search by
-  name (mirrors the C++ search feature — case-insensitive partial matching)
-- Selecting an exercise from this screen should be usable as a building
-  block by Phase 2's workout builder, not just a standalone browse feature
+#### Phase 2 — Build a workout (editing surface + AI stub)
 
-Done when: I can open a screen, search for an exercise by name, and see it in
-a results list with its associated muscle groups.
+The heart of V4 and the app's core interaction. Split into two sub-parts.
 
-#### Phase 2 — Build a workout ahead of time
+**Phase 2a — The editing surface, fed by cloning a past workout**
 
-The "plan before the gym" half of the new flow.
+- Entry point: choose a past workout to start from. It loads as an editable
+  _draft_ — a `Workout` in memory that isn't saved yet.
+- On the editing surface I can: adjust each set's reps/weight, add/remove
+  individual sets, add exercises (pulled from the library via an exercise
+  picker built on Phase 1), and remove exercises.
+- Set the new workout's name/date.
+- Save the assembled draft with `addWorkout` — the existing agnostic save path,
+  unchanged. The draft is just a `Workout`; the save path doesn't care it came
+  from a clone.
 
-- New screen: build a workout — set name/date, then add exercises pulled
-  from the library (Phase 1)
-- For each exercise added, specify planned sets (reps + weight per set), with
-  the ability to add/remove individual sets while building
-- Save the assembled workout to the database using a save function that
-  doesn't care how the data was assembled — a human filling out this form
-  today, or an AI handing over a pre-filled structure later (V5), should both
-  be able to call the same save path
-- This reuses/extends `addWorkout`, now adapted for the new sets-based shape
-  from Phase 0
+Done when: I can pick a past workout, load it as a draft, change sets/reps/
+weight, add and remove exercises and sets, save it, and see the new workout
+appear correctly in the list and detail screens.
 
-Done when: I can build a full workout from exercises in the library, save it,
-and see it appear correctly in the workout list and detail screens.
+**Phase 2b — AI entry point (stub only)**
+
+- A visible "Build with AI" entry point: a text input for a natural-language
+  request and a button. Present and styled, but does nothing yet.
+- Purpose is to design and commit the _seam_ now: the AI producer will take
+  (1) my text prompt and (2) past-workout context, and output a `Workout`-
+  shaped draft that feeds the exact same editing surface from 2a.
+- No network calls, no API key, no parsing. The button is inert or shows a
+  "coming in V5" placeholder.
+
+Done when: the AI entry point is visible in the build flow, the hand-off
+contract (prompt + context in → `Workout` draft out → editing surface) is
+written down, and nothing about it is wired to a real request.
 
 #### Phase 3 — Live in-workout editing
 
-The Volt-inspired experience: follow the plan, adjust as reality happens.
+Follow the plan, adjust as reality happens. Reuses the editing mechanics built
+in 2a as much as possible.
 
-- New screen, separate from the builder (deliberate decision — these are two
-  distinct screens, not one shared one): an "active workout" view that opens
-  a saved planned workout
-- Each set's reps/weight is tap-to-edit inline — tapping a value lets you
-  overwrite it with what actually happened, without leaving the screen
-- Ability to swap an exercise entirely (replace with a different library
-  exercise; whether this keeps or clears its planned sets is an open
-  question, decide when building this)
-- Ability to add or remove sets live, same mechanism as the builder screen,
-  ideally reusing the same underlying components
-- Changes save back to the same workout record — when the workout is marked
-  done, what's stored reflects what was actually done, not just the original
-  plan
+- Open a saved planned workout into an "active workout" view.
+- Tap-to-edit inline on each set's reps/weight — overwrite with what actually
+  happened without leaving the screen.
+- Swap an exercise for a different library exercise (open question: keep or
+  clear its planned sets).
+- Add/remove sets live, ideally the same underlying components as the builder.
+- Changes save back to the same workout record, so what's stored reflects what
+  was actually done.
 
-Done when: I can open a planned workout, change a weight/rep value on a
-specific set mid-workout, swap an exercise, add an extra set, and have all of
-it persist correctly when I back out and reopen the workout later.
+Open design question carried over: is the live in-workout screen the _same_
+screen as the 2a editing surface, or a distinct one? The original roadmap made
+them deliberately separate; the re-sequencing (2a now covers most of the same
+editing mechanics) may make sharing one screen the better call. Decide when
+building Phase 3.
+
+Done when: I can open a planned workout, change a weight/rep on a specific set
+mid-workout, swap an exercise, add a set, and have all of it persist when I back
+out and reopen later.
 
 #### Phase 4 — Edit and delete past workouts
 
-Rounds out CRUD on already-completed workouts (distinct from live in-workout
-editing in Phase 3, which happens during an active session).
+- Enter an edit mode for a past workout from the detail screen (reuses the
+  editing surface).
+- Delete a workout with a confirmation step (no silent data loss).
+- Delete cascades correctly: removing a workout removes its exercises and their
+  sets — no orphaned rows.
 
-- From the detail screen, ability to enter an edit mode for a past workout
-- Delete a workout entirely (with a confirmation step — no silent data loss)
-- Delete should cascade correctly: removing a workout removes its exercises
-  and their sets, not just the top-level row
-
-Done when: I can correct a mistake in a past workout or remove one entirely,
-and the database stays consistent (no orphaned exercise/set rows left
-behind).
+Done when: I can correct or remove a past workout and the database stays
+consistent.
 
 #### Phase 5 — Notes (lightweight, time-permitting)
 
-Deferred in spirit to V5, but cheap enough to slot in here if Phases 0–4 go
-well.
-
-- A single free-text notes field per workout (not per exercise/set — keep it
-  simple)
-- Editable from the same edit flow as Phase 4
-- No structure, no AI involvement yet — just a place to jot something down
-  ("felt strong today," "shoulder was tight on press")
+- A single free-text notes field per workout (not per exercise/set).
+- Editable from the Phase 4 edit flow.
+- No AI involvement yet — just a place to jot something down. (Note: this pairs
+  naturally with the V5 AI work, since a note like "legs were tight today" is
+  exactly the kind of context the AI producer would use.)
 
 Done when: I can add and edit a short note on a workout, and it persists.
 
 #### Phase 6 — Filter the exercise library
 
-Currently search is name-only. The library schema already includes `equipment`
-and `category` columns, and `libraryPrimaryMuscles` / `librarySecondaryMuscles`
-support muscle-based filtering.
-
-- Add filter controls to the library browse and exercise picker screens
-  (equipment, category, primary muscle — most useful for workout building)
-- Extend `searchExerciseLibraryByName` or add a new `searchExercises` function
-  that accepts optional filter parameters and builds the WHERE clause dynamically
-- Consider trimming the 873-exercise dataset to exercises actually relevant
-  before adding filters, since the full dataset includes
-  stretching, cardio, strongman, and olympic lifting that may not be useful
+- Add filter controls to the library and exercise-picker screens (equipment,
+  category, primary muscle).
+- Extend search or add a function that accepts optional filters and builds the
+  WHERE clause dynamically.
+- Consider trimming the 873-exercise dataset to exercises relevant to my
+  training before adding filters.
 
 Done when: I can filter the exercise list by equipment, category, or muscle
 group in addition to searching by name.
 
 #### Phase 7 — Polish and document
 
-Same shape as V3's Phase 6.
-
-- Clean up styling consistency across the new screens against the existing
-  ones
-- Handle empty/edge states introduced by new features (empty exercise
-  library search results, a workout with zero exercises, etc.)
-- Update README to reflect V4's new capabilities
-- Reflection: what was hard, what surprised me, what changed from this plan
-  by the time I got here — including an honest pace check against the
-  two-week-per-version target before committing further time to V5/V6
+- Styling consistency across all new screens against existing ones.
+- Empty/edge states (empty search, workout with zero exercises, empty draft).
+- Tab bar polish (icons, labels, header titles).
+- Update README for V4's capabilities.
+- Reflection: what was hard, what surprised me, what changed from this plan —
+  including an honest pace check against the two-week-per-version target before
+  committing to V5/V6.
 
 ### V4 complete when
 
-- A workout can be fully built ahead of time using a real exercise library
-- A planned workout can be followed during a gym session, with live editing
-  of sets, reps, weight, and exercises
-- Past workouts can be edited or deleted
-- The schema correctly models multiple sets per exercise
-- The app is something I'm actually using at the gym, not just viewing
-  seeded data
+- I can build a workout by starting from a past workout and adjusting it.
+- A planned workout can be followed during a session with live editing of sets,
+  reps, weight, and exercises.
+- Past workouts can be edited or deleted, with correct cascade deletes.
+- The AI build entry point is visibly present with its hand-off contract
+  designed, ready to be made real in V5.
+- The schema correctly models multiple sets per exercise.
+- The app is something I'm actually using at the gym, not just viewing seeded
+  data.
 
 ### Open questions / decide-when-you-get-there
 
-- Exercise swap in Phase 3: does swapping an exercise keep its planned sets
-  (just renamed) or clear them and start fresh?
-- Exercise library seed source: reuse the free-exercise-db dataset from the
-  C++ project, or start narrower with just exercises already in real seeded
-  workouts?
+- **Editing surface vs. live in-workout screen:** one shared screen or two
+  separate ones? (Phase 2a / Phase 3)
+- **Past workout vs. preset/template:** are these the same mechanism (a preset
+  is just a saved workout you clone) or genuinely different? Presets like
+  push/pull/legs are an idea worth capturing but not yet scoped into a phase.
+- **Exercise swap in Phase 3:** does swapping keep its planned sets or clear
+  them?
+- **AI context (deferred to V5, but shapes the 2b seam):** what exactly gets
+  passed to the AI — how many past workouts, filtered by muscle group or
+  recency, plus notes?
 
 ---
 
-## Later Versions (lighter detail — to be expanded when closer)
+## V5 — AI feedback (updated)
 
-### V5 — AI feedback
+The AI seam is designed and stubbed in V4 Phase 2b, so V5 is "make the stub
+real" rather than "figure out where AI goes."
 
-- Integrate the Anthropic API from the mobile app
-- In-workout feedback: tell the AI something ("my hamstring hurt on that
-  exercise") and get suggestions, including proposed workout changes to accept
-- Post-workout analysis based on the workout and any notes
-- Likely home for full notes support, building on the lightweight version
-  from V4 Phase 5 if that was completed
-- Approachable once the app exists and network requests are understood
+- Implement the AI workout producer behind the V4 stub: take my text prompt
+  plus past-workout context, call the Anthropic API, and turn the response into
+  a valid `Workout` draft that feeds the existing editing surface.
+- The real engineering here (flagged early so it's not a surprise): asynchronous
+  network requests that can fail or time out, API key handling, prompt design,
+  passing the right past-workout context, and — the underestimated part —
+  validating that the model's response is a well-formed `Workout` and handling
+  it gracefully when it isn't.
+- Build and verify the producer in isolation first (log the `Workout` object,
+  feed a hardcoded one to the editing surface) before wiring a live request, so
+  every bug is contained to the AI layer.
+- In-workout and post-workout feedback: tell the AI something ("hamstring hurt
+  on that set") and get suggestions, including proposed changes to accept.
+- Full notes support builds on V4 Phase 5's lightweight version.
 
 ### V6 — Garmin integration
 
