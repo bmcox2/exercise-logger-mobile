@@ -7,6 +7,7 @@ export const mockWorkouts: Workout[] = [
     name: "Pull",
     date: "2026-07-01",
     durationMinutes: 59,
+    status: "completed",
     exercises: [
       {
         id: 0,
@@ -94,6 +95,7 @@ export const mockWorkouts: Workout[] = [
     name: "Push",
     date: "2026-06-30",
     durationMinutes: 65,
+    status: "completed",
     exercises: [
       {
         id: 0,
@@ -182,6 +184,7 @@ export const mockWorkouts: Workout[] = [
     name: "Legs",
     date: "2026-06-23",
     durationMinutes: 56,
+    status: "completed",
     exercises: [
       {
         id: 0,
@@ -258,6 +261,7 @@ export const mockWorkouts: Workout[] = [
     name: "Pull",
     date: "2026-06-16",
     durationMinutes: 55,
+    status: "completed",
     exercises: [
       {
         id: 0,
@@ -344,6 +348,7 @@ export const mockWorkouts: Workout[] = [
     name: "Push",
     date: "2026-06-15",
     durationMinutes: 58,
+    status: "completed",
     exercises: [
       {
         id: 0,
@@ -432,6 +437,7 @@ export const mockWorkouts: Workout[] = [
     name: "Legs",
     date: "2026-06-12",
     durationMinutes: 54,
+    status: "completed",
     exercises: [
       {
         id: 0,
@@ -508,6 +514,7 @@ export const mockWorkouts: Workout[] = [
     name: "Pull",
     date: "2026-06-10",
     durationMinutes: 53,
+    status: "completed",
     exercises: [
       {
         id: 0,
@@ -585,6 +592,7 @@ export const mockWorkouts: Workout[] = [
     name: "Push",
     date: "2026-06-08",
     durationMinutes: 60,
+    status: "completed",
     exercises: [
       {
         id: 0,

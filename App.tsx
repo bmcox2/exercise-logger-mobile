@@ -13,6 +13,8 @@ import BuildStartScreen from "./src/screens/BuildStartScreen";
 import SelectSourceWorkoutScreen from "./src/screens/SelectSourceWorkoutScreen";
 import BuildWorkoutScreen from "./src/screens/BuildWorkoutScreen";
 import SourceWorkoutDetailScreen from "./src/screens/SourceWorkoutDetailScreen";
+import SelectExerciseForBuildScreen from "./src/screens/SelectExerciseForBuildScreen";
+import ExerciseDetailForBuildScreen from "./src/screens/ExerciseDetailForBuildScreen";
 import { WorkoutsStackParamList, LibraryStackParamList, BuildStackParamList } from "./src/types";
 import { initDatabase } from "./src/db/database";
 
@@ -89,6 +91,14 @@ export default function App() {
               <BuildStack.Screen
                 name="BuildWorkout"
                 component={BuildWorkoutScreen}
+              />
+              <BuildStack.Screen
+                name="SelectExerciseForBuild"
+                component={SelectExerciseForBuildScreen}
+              />
+              <BuildStack.Screen
+                name="ExerciseDetailForBuild"
+                component={ExerciseDetailForBuildScreen}
               />
             </BuildStack.Navigator>
           )}

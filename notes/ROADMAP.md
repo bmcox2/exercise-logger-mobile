@@ -467,6 +467,8 @@ group in addition to searching by name.
   push/pull/legs are an idea worth capturing but not yet scoped into a phase.
 - **Exercise swap in Phase 3:** does swapping keep its planned sets or clear
   them?
+- **Save vs. start (Phase 3):** are "save for later" and "start this workout
+  now" separate actions, or does building flow directly into doing?
 - **AI context (deferred to V5, but shapes the 2b seam):** what exactly gets
   passed to the AI — how many past workouts, filtered by muscle group or
   recency, plus notes?
@@ -541,3 +543,4 @@ real" rather than "figure out where AI goes."
   schema lands, since per-set data is more accurate than per-exercise
   totals.
 - (New, V4 Phase 1) Exercise library seed runs 873 individual inserts sequentially on first launch, causing ~30 second delay. One-time cost only — subsequent launches skip the seed entirely. Fix with bulk inserts or seed during account setup if first-launch experience ever matters (e.g. before sharing the app with others).
+- (New, V4 Phase 2a) `handleSave` in `BuildWorkoutScreen` has no try/catch around `addWorkout` — a failed save fails silently with no user-facing error. Add proper error handling in Phase 7.

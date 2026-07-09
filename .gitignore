@@ -41,5 +41,5 @@ yarn-error.*
 /android
 
 # notes
-jsCourse.md
-reactCourse.md
+notes/*.md
+!notes/ROADMAP.md

@@ -5,6 +5,7 @@ import {
   WorkoutSet,
   ExerciseLibraryItem,
   ExerciseLibraryRow,
+  DraftWorkout,
 } from "../types";
 
 import { mockWorkouts } from "../data/mockData";
@@ -14,13 +15,14 @@ import exerciseData from "../../assets/exercises.json";
 let db: SQLite.SQLiteDatabase;
 
 export async function initDatabase() {
-  db = await SQLite.openDatabaseAsync("workouts_v3.db");
+  db = await SQLite.openDatabaseAsync("workouts_v4.db");
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         date TEXT NOT NULL,
-        durationMinutes INTEGER
+        durationMinutes INTEGER,
+        status TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS exercises (
@@ -74,8 +76,16 @@ export async function initDatabase() {
   await seedDatabase();
 }
 
-export async function getWorkouts(): Promise<Workout[]> {
-  return await db.getAllAsync("SELECT * FROM workouts ORDER BY date DESC");
+export async function getWorkouts(
+  filter: "planned" | "completed" | "all",
+): Promise<Workout[]> {
+  if (filter === "all") {
+    return await db.getAllAsync(`SELECT * FROM workouts ORDER BY date DESC `);
+  }
+  return await db.getAllAsync(
+    "SELECT * FROM workouts WHERE status = ? ORDER BY date DESC ",
+    filter,
+  );
 }
 
 async function getMuscles(
@@ -132,20 +142,25 @@ export async function getWorkoutById(id: number): Promise<Workout | null> {
   return { ...workout, exercises } as Workout;
 }
 
-async function addWorkout(workout: Workout): Promise<void> {
+export async function addWorkout(
+  workout: DraftWorkout,
+  status: "planned" | "completed",
+): Promise<number> {
+  let newWorkoutId = 0;
   await db.withTransactionAsync(async () => {
     const workoutResult = await db.runAsync(
-      "INSERT INTO workouts (name, date, durationMinutes) VALUES (?, ?, ?)",
+      "INSERT INTO workouts (name, date, durationMinutes, status) VALUES (?, ?, ?, ?)",
       workout.name,
       workout.date,
       workout.durationMinutes,
+      status,
     );
-    const workoutId = workoutResult.lastInsertRowId;
+    newWorkoutId = workoutResult.lastInsertRowId;
 
     for (const exercise of workout.exercises) {
       const exerciseResult = await db.runAsync(
         "INSERT INTO exercises (workout_id, name) VALUES (?, ?)",
-        workoutId,
+        newWorkoutId,
         exercise.name,
       );
       const exerciseId = exerciseResult.lastInsertRowId;
@@ -175,6 +190,7 @@ async function addWorkout(workout: Workout): Promise<void> {
       }
     }
   });
+  return newWorkoutId;
 }
 
 async function addExerciseData(exercise: ExerciseLibraryItem): Promise<void> {
@@ -207,7 +223,7 @@ async function seedDatabase() {
   const existingWorkouts = await db.getAllAsync("SELECT * FROM workouts");
   if (existingWorkouts.length === 0) {
     for (const workout of mockWorkouts) {
-      await addWorkout(workout);
+      await addWorkout(workout, workout.status);
     }
   }
 

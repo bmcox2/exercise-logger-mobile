@@ -19,6 +19,7 @@ export interface Workout {
   date: string;
   durationMinutes: number;
   exercises: Exercise[];
+  status: "planned" | "completed";
 }
 
 export type WorkoutsStackParamList = {
@@ -36,6 +37,15 @@ export type BuildStackParamList = {
   SelectSourceWorkout: undefined;
   SourceWorkoutDetail: { workoutId: number };
   BuildWorkout: { sourceWorkoutId: number };
+  SelectExerciseForBuild: {
+    onSelect: (item: ExerciseLibraryRow) => void;
+    sourceWorkoutId: number;
+  };
+  ExerciseDetailForBuild: {
+    exerciseId: number;
+    onSelect: (item: ExerciseLibraryRow) => void;
+    sourceWorkoutId: number;
+  };
 };
 
 export interface ExerciseLibraryItem {

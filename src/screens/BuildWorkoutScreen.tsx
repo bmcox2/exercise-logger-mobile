@@ -5,17 +5,22 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useState, useEffect, useReducer } from "react";
 
 import { BuildStackParamList, Workout, DraftWorkout } from "../types";
-import { getWorkoutById } from "../db/database";
-import { cloneWorkoutAsDraft, draftReducer } from "../utils/draftWorkout";
+import { getWorkoutById, addWorkout } from "../db/database";
+import {
+  cloneWorkoutAsDraft,
+  createDraftExerciseFromLibraryItem,
+  draftReducer,
+} from "../utils/draftWorkout";
 
 type Props = NativeStackScreenProps<BuildStackParamList, "BuildWorkout">;
 
-export default function BuildWorkoutScreen({ route }: Props) {
+export default function BuildWorkoutScreen({ route, navigation }: Props) {
   const [workout, setWorkout] = useState<Workout | null>(null);
   const { sourceWorkoutId } = route.params;
 
@@ -35,11 +40,42 @@ export default function BuildWorkoutScreen({ route }: Props) {
     );
   }
 
-  return <BuildWorkoutEditor initialDraft={cloneWorkoutAsDraft(workout)} />;
+  return (
+    <BuildWorkoutEditor
+      initialDraft={cloneWorkoutAsDraft(workout)}
+      navigation={navigation}
+      sourceWorkoutId={sourceWorkoutId}
+    />
+  );
 }
 
-function BuildWorkoutEditor({ initialDraft }: { initialDraft: DraftWorkout }) {
+function BuildWorkoutEditor({
+  initialDraft,
+  navigation,
+  sourceWorkoutId,
+}: {
+  initialDraft: DraftWorkout;
+  navigation: Props["navigation"];
+  sourceWorkoutId: number;
+}) {
   const [draft, dispatch] = useReducer(draftReducer, initialDraft);
+
+  async function handleSave() {
+    if (draft.name.trim() === "") {
+      Alert.alert("Please enter a workout name.");
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) {
+      Alert.alert("Date must be in YYYY-MM-DD format.");
+      return;
+    }
+    if (draft.exercises.length === 0) {
+      Alert.alert("Add at least one exercise.");
+      return;
+    }
+    await addWorkout(draft, "planned");
+    navigation.goBack();
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -150,8 +186,24 @@ function BuildWorkoutEditor({ initialDraft }: { initialDraft: DraftWorkout }) {
         </View>
       ))}
 
-      <Pressable style={styles.addExerciseButton}>
+      <Pressable
+        style={styles.addExerciseButton}
+        onPress={() =>
+          navigation.navigate("SelectExerciseForBuild", {
+            onSelect: (item) =>
+              dispatch({
+                type: "ADD_EXERCISE",
+                exercise: createDraftExerciseFromLibraryItem(item),
+              }),
+            sourceWorkoutId,
+          })
+        }
+      >
         <Text style={styles.addExerciseText}>+ Add Exercise</Text>
+      </Pressable>
+
+      <Pressable style={styles.saveButton} onPress={handleSave}>
+        <Text style={styles.saveButtonText}>Save</Text>
       </Pressable>
     </ScrollView>
   );
@@ -280,5 +332,17 @@ const styles = StyleSheet.create({
   addExerciseText: {
     fontSize: 16,
     color: "#007AFF",
+  },
+  saveButton: {
+    marginBottom: 40,
+    backgroundColor: "#007AFF",
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

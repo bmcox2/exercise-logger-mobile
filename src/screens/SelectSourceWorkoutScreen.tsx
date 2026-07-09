@@ -1,6 +1,7 @@
 import { View, Text, Pressable, FlatList, StyleSheet } from "react-native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { BuildStackParamList, Workout } from "../types";
 import { getWorkouts } from "../db/database";
@@ -10,13 +11,15 @@ type Props = NativeStackScreenProps<BuildStackParamList, "SelectSourceWorkout">;
 export default function SelectSourceWorkoutScreen({ navigation }: Props) {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
 
-  useEffect(() => {
-    async function load() {
-      const data = await getWorkouts();
-      setWorkouts(data);
-    }
-    load();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      async function load() {
+        const data = await getWorkouts("completed");
+        setWorkouts(data);
+      }
+      load();
+    }, []),
+  );
 
   return (
     <View style={styles.container}>
@@ -32,14 +35,18 @@ export default function SelectSourceWorkoutScreen({ navigation }: Props) {
             <View style={styles.actions}>
               <Pressable
                 onPress={() =>
-                  navigation.navigate("SourceWorkoutDetail", { workoutId: item.id })
+                  navigation.navigate("SourceWorkoutDetail", {
+                    workoutId: item.id,
+                  })
                 }
               >
                 <Text style={styles.actionText}>View Details</Text>
               </Pressable>
               <Pressable
                 onPress={() =>
-                  navigation.navigate("BuildWorkout", { sourceWorkoutId: item.id })
+                  navigation.navigate("BuildWorkout", {
+                    sourceWorkoutId: item.id,
+                  })
                 }
               >
                 <Text style={styles.actionText}>Select</Text>
