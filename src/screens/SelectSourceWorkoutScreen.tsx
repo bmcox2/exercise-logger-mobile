@@ -1,5 +1,5 @@
 import { View, Text, Pressable, FlatList, StyleSheet } from "react-native";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 

@@ -379,29 +379,194 @@ Done when: the AI entry point is visible in the build flow, the hand-off
 contract (prompt + context in → `Workout` draft out → editing surface) is
 written down, and nothing about it is wired to a real request.
 
-#### Phase 3 — Live in-workout editing
+## V4 Phase 3 — The in-workout flow (In Depth)
 
-Follow the plan, adjust as reality happens. Reuses the editing mechanics built
-in 2a as much as possible.
+### What this phase is
 
-- Open a saved planned workout into an "active workout" view.
-- Tap-to-edit inline on each set's reps/weight — overwrite with what actually
-  happened without leaving the screen.
-- Swap an exercise for a different library exercise (open question: keep or
-  clear its planned sets).
-- Add/remove sets live, ideally the same underlying components as the builder.
-- Changes save back to the same workout record, so what's stored reflects what
-  was actually done.
+Phase 3 turns a saved _planned_ workout into something I actually do at the
+gym: one exercise on screen at a time, logging what I actually lifted against
+what I planned, stepping through each set, with live edits and timers, until
+the workout is finished and flips from `"planned"` to `"completed"`.
 
-Open design question carried over: is the live in-workout screen the _same_
-screen as the 2a editing surface, or a distinct one? The original roadmap made
-them deliberately separate; the re-sequencing (2a now covers most of the same
-editing mechanics) may make sharing one screen the better call. Decide when
-building Phase 3.
+This is the largest phase in V4 by far, and it's the first time a single
+screen carries this much at once (current exercise, set progression, editable
+actuals, timers, a live-edit menu). So it's broken into sub-phases the way
+Phase 2 was, built spine-first: get the core set-logging loop working, then
+hang everything else off it.
 
-Done when: I can open a planned workout, change a weight/rep on a specific set
-mid-workout, swap an exercise, add a set, and have all of it persist when I back
-out and reopen later.
+Modeled loosely on the Volt app's in-workout flow, with two deliberate
+departures from Volt noted below.
+
+### Two decisions already made
+
+- **Flat, not grouped.** Volt organizes exercises into groups (supersets /
+  circuits) and cycles set-by-set through a group. My data model is flat —
+  a workout is a list of exercises, each with a list of sets — and the
+  in-workout flow follows that: one exercise, do all its sets, then the next
+  exercise. Groups/supersets are a possible future version, not V4; adding
+  them now would mean a schema change and threading group structure through
+  everything already built.
+- **Timers are in scope, but come last within Phase 3**, because they
+  introduce genuinely new concepts (intervals, effect cleanup) that are
+  separable from the core logging loop.
+
+---
+
+### Phase 3a — Start a workout & the core set-logging loop (the spine)
+
+The thing everything else feeds. Build the simplest version that works end to
+end before adding anything on top.
+
+- **Entry point:** a way to pick a saved _planned_ workout and start doing it.
+  Reuses `getWorkouts("planned")`. Likely a list screen similar in shape to
+  `SelectSourceWorkout`. (Design decision below: where this lives, and whether
+  it connects to the save-vs-start open question.)
+- **The active-workout state:** load the planned workout and represent it in a
+  form that tracks, per set, the _planned_ target and the _actual_ value the
+  user logs, plus which exercise/set is current, plus which sets are done.
+- **The screen:** one exercise on screen at a time; current set indicator
+  ("SET 1 2 3"); planned weight/reps shown as the starting hint; an editable
+  field for actual weight/reps; a "Done" button that logs the actual values
+  and advances to the next set, then the next exercise.
+- **Progress indicator** across the whole workout (Volt's top bar).
+- **Completion:** when the last set of the last exercise is done, the workout
+  flips `"planned"` → `"completed"`, the actual logged values are saved,
+  `durationMinutes` is set (from a start-to-finish elapsed time), and the app
+  navigates out. This reuses the one-save-path principle: on completion it
+  produces the same shape `addWorkout(..., "completed")` already consumes.
+
+**The first and most important design decision — the active-workout data
+structure.** During a workout, each set needs more than a `DraftWorkoutSet`
+carries: a _planned_ value (the target, shown as a hint) AND an _actual_ value
+(what I did) AND a done flag; plus the workout needs a progression pointer
+(current exercise / current set). Options to weigh when building 3a:
+
+- reuse `DraftWorkout` and overwrite reps/weight with actuals in place, tracking
+  progression in separate component state (simplest, but loses the planned
+  value once overwritten — and the UI wants to show planned-as-hint alongside
+  actual);
+- a richer `ActiveWorkout` structure where each set holds planned + actual +
+  done (more faithful to the UI, more to build);
+- something in between.
+  Decide this first, with the UI's needs (show target + type actual) as the
+  deciding input.
+
+**Other 3a decisions:**
+
+- Where does "start a workout" live — a new tab, the Workouts tab, a future
+  home screen? (Ties to the still-open save-vs-start question: does building a
+  workout flow directly into doing it, or are they separate entry points?)
+- Whether a `useReducer` (like the builder) is the right tool for progression +
+  actuals, or whether this is simpler with plain state.
+
+**Done when:** I can pick a planned workout, step through every exercise and
+set logging actual reps/weight, finish it, and see it appear in my completed
+history with the correct actual values and a real duration.
+
+---
+
+### Phase 3b — Live edits mid-workout (the actions menu)
+
+Volt's "Actions" menu (replace movement, add set, write note). Most of this
+reuses reducer actions and the exercise picker already built in Phase 2.
+
+- An actions menu (bottom sheet / modal) opened from the active workout screen.
+- **Add set** live — reuses the `ADD_SET` concept.
+- **Replace exercise** — reuses the `SelectExerciseForBuild` picker flow and the
+  callback-based navigation pattern from Phase 2.
+- **Remove set** if wanted.
+- **Write note** — either a lightweight note now (pairs with Phase 5) or a stub
+  pointing at it; a mid-workout note ("machine was taken, subbed X") is exactly
+  the kind of context the V5 AI will want.
+
+**Design decision (already flagged in the roadmap's open questions):** when I
+replace an exercise mid-workout, does the new exercise keep the old one's
+planned sets, or start fresh? Decide here.
+
+**Done when:** mid-workout I can add a set, replace an exercise for a different
+one from the library, and have those changes persist into the completed record.
+
+---
+
+### Phase 3c — Timers
+
+The genuinely new-concept chunk. Kept separate because intervals and effect
+cleanup are new territory and shouldn't be entangled with the core loop while
+learning them.
+
+- **Rest timer between sets** — a count-up timer that auto-starts when I finish
+  a set and runs until I dismiss it (matches how I actually rest-time my own
+  workouts). Requires **no data-model change** — it works for any exercise.
+  This is the first timer to build.
+- **New concept:** `setInterval`, storing timer state, and cleaning up the
+  interval in a `useEffect` return function so it doesn't leak or keep running
+  after the component unmounts.
+- **Exercise / hold timer** (Volt's timed holds, e.g. 30–60 sec) — a count-up
+  or countdown for timed exercises. This one **does** need a data-model
+  decision (see open questions): my schema has no concept of a "timed"
+  exercise, only reps + weight. The hold timer may be deferred within 3c, or to
+  a later version, depending on how big that model change turns out to be.
+
+**Done when:** a rest timer starts automatically after I finish a set and
+counts up until I dismiss it. (Stretch: timed exercises show a hold timer.)
+
+---
+
+### Phase 3d — Post-workout summary (lightweight)
+
+The completion _transition_ lives in 3a; this adds a simple summary of what
+just happened.
+
+- A basic post-workout summary screen (total time, exercises done, maybe total
+  volume) — a light version of Volt's summary, reusing existing detail-render
+  patterns. Rich stats/charts (Volt's movement-pattern breakdowns) are backlog.
+- Lands the user back somewhere sensible afterward.
+
+**Done when:** finishing a workout shows a basic summary and returns me to a
+sensible screen.
+
+---
+
+### Kept in mind but explicitly deferred (V5 / backlog)
+
+These appear in the Volt screenshots and are worth designing _around_ — leaving
+clean hook points — without building now. Unlike the AI builder button (a
+persistent visible stub), these are transient modals that can slot in at their
+trigger points later without redesigning the flow, so they need integration
+_awareness_, not stubs:
+
+- **Pre-workout readiness check-in** (Volt image 4) → fires before a workout
+  starts; feeds V5 AI. Hook point: the "start workout" action in 3a.
+- **Per-set effort / RPE** (image 9) → fires between sets; feeds V5 AI 1-rep-max
+  and progression estimates. Hook point: the "Done" action in 3a.
+- **Post-workout feedback** (effort slider, enjoyment, notes — image 11) → fires
+  on completion; feeds V5 AI. Hook point: the completion transition in 3a / the
+  summary in 3d.
+- **Video / image demos** per exercise → polish; stub the image area for now.
+
+### Open questions / data-model gaps to decide when reached
+
+- **Active-workout data structure** (3a) — reuse `DraftWorkout` or a richer
+  planned+actual+done shape. The biggest single decision in the phase.
+- **Start-workout entry point** (3a) — new tab, Workouts tab, or future home
+  screen; and whether build flows directly into doing.
+- **Replace-exercise keeps or clears sets** (3b).
+- **Timed vs rep-based exercises** (3c) — the schema is reps + weight only. Volt
+  has timed holds ("30–60 sec"), bodyweight ("BW", no weight), and unilateral
+  ("15 reps each"). Supporting timed exercises + their hold timer needs a model
+  change (an exercise "type" or a duration field). Decide scope when reaching
+  3c; may defer the timed-exercise support itself to a later version even if the
+  rest timer ships in V4.
+
+### Whole-picture connections to preserve
+
+- On completion, the active workout must produce the same shape
+  `addWorkout(..., "completed")` consumes — the one-save-path principle carries
+  straight through from Phase 2.
+- Mid-workout notes (3b) connect to Phase 5 (notes) and to V5 (AI context).
+- The planned→completed lifecycle built in Phase 2's schema is what this whole
+  phase operates on — 3a is where the `"completed"` half of that column finally
+  gets used.
 
 #### Phase 4 — Edit and delete past workouts
 
