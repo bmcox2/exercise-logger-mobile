@@ -6,6 +6,7 @@ import {
   ExerciseLibraryItem,
   ExerciseLibraryRow,
   DraftWorkout,
+  ActiveWorkout,
 } from "../types";
 
 import { mockWorkouts } from "../data/mockData";
@@ -191,6 +192,31 @@ export async function addWorkout(
     }
   });
   return newWorkoutId;
+}
+
+export async function completeWorkout(
+  workout: ActiveWorkout,
+  durationMinutes: number,
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      "UPDATE workouts SET durationMinutes = ?, status = ? WHERE id = ?",
+      durationMinutes,
+      "completed",
+      workout.id,
+    );
+
+    for (const exercise of workout.exercises) {
+      for (const set of exercise.sets) {
+        await db.runAsync(
+          "UPDATE sets SET reps = ?, weight = ? WHERE id = ?",
+          set.actualReps,
+          set.actualWeight,
+          set.id,
+        );
+      }
+    }
+  });
 }
 
 async function addExerciseData(exercise: ExerciseLibraryItem): Promise<void> {

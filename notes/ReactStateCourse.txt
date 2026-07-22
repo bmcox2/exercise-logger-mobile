@@ -1,0 +1,101 @@
+Module 1:
+Practice:
+
+1. addNumber(list: number[], n: number): number[] {
+    return [...list, n];
+}
+
+2. Given const users = [{ id: 1, active: true }, { id: 2, active: true }], 
+write a function that returns a new array where the user with id: 2 has active: false, 
+and the user with id: 1 is untouched (same reference).
+
+setActive(list: users[], state: boolean): users[] {
+    return {
+        ...list,
+            user: list.user.map((user) => 
+            user.id === 2
+            ? {...user, active: state}
+            : user),
+    };
+}
+
+3. I am not entirely sure what the question is referring too. Could you please rephrase or maybe provide an example of what you are asking about.
+
+Quiz:
+1. I may need these concept explained more, but based on the course, mutating a nested object will change things elsewhere in the app that weren't intended to be changed
+2. Primatives make a new object/reference and copy the value of the previous one, so you will end up with two distinct object and can safely mutate the second one without changing the first
+Objects on the other hand do not create a new object but create a new reference to that object, so changing the second one will also change the first. 
+3. REMOVE_EXERCISE need to remove a specific exercise that could live anywhere inside the array so filter is needed to pick the exact place/id
+REMOVE_SET always just removes the last set in the array, so the location is always known, and splice can do the job there of removing the last object in the array. 
+
+
+Module 2:
+Practice:
+const [num, dispatch] = useReducer(numberReducer, initialState);
+
+type numberAction = |
+{ type: "INCREMENT" } |
+{ type: "DECREMENT" } |
+{ type: "RESET" } |
+{ type: "SET"; value: number };
+
+function numberReducer(num: number, action: numberAction): number {
+    switch(action.type) {
+        case "INCREMENT":
+            return ++num;
+        case "DECREMENT"
+            return --num;
+        case "RESET"
+            num = 0;
+            return num;
+        case "SET"
+            num = action.value;
+            return num;
+        default:
+            return num;
+    }
+}
+
+useReducer allows you to perform multiple different operations within a single function by just decribing what you want to do. useState only allows you to define one operation.
+
+Quiz:
+1. dispatch just calls the reducer and tells it what operation to do and passes the necassary parameters. It does not directly change the object, the reducer handles that.
+2. If the user accidentally passes an action that does not exist, the reducer would have an error without the default. The default covers for this by just returning the same object without modifying it.
+3. If TypeScript did not support that syntax, I would have to write two seperate actions for UPDATE_WEIGHT and UPDATE_reps instead of having them in one.
+
+
+Module 3:
+Practice:
+1. The component keeps the original state of 5 because it only ever calls useState on mount, so the component keeps the original initialValue on rerender.
+2. useReducer is only called once on remount and not again, so we must ensure that it has the correct data when it mounts. 
+BuildWorkoutScreen first needs to retrieve the Workout data and this takes some time, so we don't want to call the useReducer until we actually retrieve the data, 
+so we split the function up which ensure useReducer is not called until the data is recieved.
+3. The useEffect is not recalled because when the screens navigated forward, none of the screens were unmounted. BuildWorkout was still mounteed and silently waiting to be returned to.
+Once returning to BuildWorkout, it is already mounted, so useEffect is not recalled. It also has an empty dependency array.
+
+Quiz:
+1. Mount, rerender, and unmount. Rerender can happen multiple times while the other two can only occur once per instance,
+2. A mount only happens if the component does not exist yet. Once mounted, it can not be mounted again until it is destroyed/unmounted.
+3. The dependency array tells useEffect to run when that array is changed. An empty array tells it to only run once because it does not depend on anything.
+
+
+Module 4:
+Practice:
+1. navigation.navigate("ScreenB") {
+    onSelect: (item) => string
+};
+
+navigation.navigate("ScreenC") {
+    onSelect: route.params.onSelect
+};
+
+onSelect(string);
+navigation.navigate("ScreenA");
+
+2. I am not entirely sure, but my guess is ExerciseDetailForBuildScreen needs to receive sourceWorkoutId, so that it can hand it back to BuildWorkoutEditor 
+3. Again a slight guess, but I would say using goBack() would pass the parameters to screen B, but then when it calls goBack() again, those parameters are lost and not sent to A.
+
+Quiz:
+1. route.params simply only sends data forwards, not backwards. 
+2. The middle screen needs to simply pass the callback along to the third screen without modifying it.
+3. navigate would take you back to the screen that already exists and is mounted. I am not entirely sure what push does, but it presumably mounts another component, but I do not know how that acts given the component already exists.

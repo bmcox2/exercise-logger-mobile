@@ -105,3 +105,46 @@ export type DraftAction =
       field: "reps" | "weight";
       value: number;
     };
+
+export interface ActiveWorkoutSet {
+  id: number;
+  setNumber: number;
+  plannedReps: number;
+  actualReps: number | null;
+  plannedWeight: number;
+  actualWeight: number | null;
+  done: boolean;
+}
+
+export interface ActiveExercise {
+  id: number;
+  name: string;
+  sets: ActiveWorkoutSet[];
+  currentSetIndex: number;
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+}
+
+export interface ActiveWorkout {
+  id: number;
+  name: string;
+  date: string;
+  durationMinutes: number;
+  currentExerciseIndex: number;
+  exercises: ActiveExercise[];
+  status: "planned" | "completed";
+}
+
+export type StartStackParamList = {
+  SelectPlannedWorkout: undefined;
+};
+
+export type ActiveWorkoutStackParamList = {
+  ActiveWorkout: { workoutId: number };
+  FinishWorkout: undefined;
+};
+
+export type RootStackParamList = {
+  MainTabs: undefined;
+  ActiveWorkoutFlow: { workoutId: number };
+};

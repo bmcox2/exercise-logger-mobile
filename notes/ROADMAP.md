@@ -709,3 +709,8 @@ real" rather than "figure out where AI goes."
   totals.
 - (New, V4 Phase 1) Exercise library seed runs 873 individual inserts sequentially on first launch, causing ~30 second delay. One-time cost only — subsequent launches skip the seed entirely. Fix with bulk inserts or seed during account setup if first-launch experience ever matters (e.g. before sharing the app with others).
 - (New, V4 Phase 2a) `handleSave` in `BuildWorkoutScreen` has no try/catch around `addWorkout` — a failed save fails silently with no user-facing error. Add proper error handling in Phase 7.
+- Migrations vs. filename-bump: dev currently resets the DB by bumping the
+  filename (workouts_v2 → v3 → v4...), which abandons the old file and its
+  data. Before real use, replace with proper ALTER TABLE migrations so schema
+  changes don't wipe accumulated workout history — and clean up orphaned old
+  .db files.

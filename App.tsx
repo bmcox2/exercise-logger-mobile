@@ -15,13 +15,26 @@ import BuildWorkoutScreen from "./src/screens/BuildWorkoutScreen";
 import SourceWorkoutDetailScreen from "./src/screens/SourceWorkoutDetailScreen";
 import SelectExerciseForBuildScreen from "./src/screens/SelectExerciseForBuildScreen";
 import ExerciseDetailForBuildScreen from "./src/screens/ExerciseDetailForBuildScreen";
-import { WorkoutsStackParamList, LibraryStackParamList, BuildStackParamList } from "./src/types";
+import SelectPlannedWorkoutScreen from "./src/screens/SelectPlannedWorkoutScreen";
+import ActiveWorkoutScreen from "./src/screens/ActiveWorkoutScreen";
+import FinishWorkoutScreen from "./src/screens/FinishWorkoutScreen";
+import {
+  WorkoutsStackParamList,
+  LibraryStackParamList,
+  BuildStackParamList,
+  StartStackParamList,
+  ActiveWorkoutStackParamList,
+  RootStackParamList,
+} from "./src/types";
 import { initDatabase } from "./src/db/database";
 
+const Root = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 const WorkoutsStack = createNativeStackNavigator<WorkoutsStackParamList>();
 const LibraryStack = createNativeStackNavigator<LibraryStackParamList>();
 const BuildStack = createNativeStackNavigator<BuildStackParamList>();
+const StartStack = createNativeStackNavigator<StartStackParamList>();
+const ActiveWorkoutStack = createNativeStackNavigator<ActiveWorkoutStackParamList>();
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -44,66 +57,102 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      <Tab.Navigator>
-        <Tab.Screen name="WorkoutsTab">
+      <Root.Navigator screenOptions={{ headerShown: false }}>
+        <Root.Screen name="MainTabs">
           {() => (
-            <WorkoutsStack.Navigator>
-              <WorkoutsStack.Screen
-                name="WorkoutList"
-                component={WorkoutListScreen}
-              />
-              <WorkoutsStack.Screen
-                name="WorkoutDetail"
-                component={WorkoutDetailScreen}
-              />
-            </WorkoutsStack.Navigator>
+            <Tab.Navigator>
+              <Tab.Screen name="WorkoutsTab">
+                {() => (
+                  <WorkoutsStack.Navigator>
+                    <WorkoutsStack.Screen
+                      name="WorkoutList"
+                      component={WorkoutListScreen}
+                    />
+                    <WorkoutsStack.Screen
+                      name="WorkoutDetail"
+                      component={WorkoutDetailScreen}
+                    />
+                  </WorkoutsStack.Navigator>
+                )}
+              </Tab.Screen>
+              <Tab.Screen name="LibraryTab">
+                {() => (
+                  <LibraryStack.Navigator>
+                    <LibraryStack.Screen
+                      name="ExerciseLibrary"
+                      component={ExerciseLibraryScreen}
+                    />
+                    <LibraryStack.Screen
+                      name="ExerciseDetail"
+                      component={ExerciseDetailScreen}
+                    />
+                  </LibraryStack.Navigator>
+                )}
+              </Tab.Screen>
+              <Tab.Screen name="BuildTab">
+                {() => (
+                  <BuildStack.Navigator>
+                    <BuildStack.Screen
+                      name="BuildStart"
+                      component={BuildStartScreen}
+                    />
+                    <BuildStack.Screen
+                      name="SelectSourceWorkout"
+                      component={SelectSourceWorkoutScreen}
+                    />
+                    <BuildStack.Screen
+                      name="SourceWorkoutDetail"
+                      component={SourceWorkoutDetailScreen}
+                    />
+                    <BuildStack.Screen
+                      name="BuildWorkout"
+                      component={BuildWorkoutScreen}
+                    />
+                    <BuildStack.Screen
+                      name="SelectExerciseForBuild"
+                      component={SelectExerciseForBuildScreen}
+                    />
+                    <BuildStack.Screen
+                      name="ExerciseDetailForBuild"
+                      component={ExerciseDetailForBuildScreen}
+                    />
+                  </BuildStack.Navigator>
+                )}
+              </Tab.Screen>
+              <Tab.Screen name="StartTab">
+                {() => (
+                  <StartStack.Navigator>
+                    <StartStack.Screen
+                      name="SelectPlannedWorkout"
+                      component={SelectPlannedWorkoutScreen}
+                    />
+                  </StartStack.Navigator>
+                )}
+              </Tab.Screen>
+            </Tab.Navigator>
           )}
-        </Tab.Screen>
-        <Tab.Screen name="LibraryTab">
-          {() => (
-            <LibraryStack.Navigator>
-              <LibraryStack.Screen
-                name="ExerciseLibrary"
-                component={ExerciseLibraryScreen}
+        </Root.Screen>
+        <Root.Screen
+          name="ActiveWorkoutFlow"
+          options={{ gestureEnabled: false }}
+        >
+          {({ route }) => (
+            <ActiveWorkoutStack.Navigator
+              screenOptions={{ gestureEnabled: false }}
+            >
+              <ActiveWorkoutStack.Screen
+                name="ActiveWorkout"
+                component={ActiveWorkoutScreen}
+                initialParams={{ workoutId: route.params.workoutId }}
               />
-              <LibraryStack.Screen
-                name="ExerciseDetail"
-                component={ExerciseDetailScreen}
+              <ActiveWorkoutStack.Screen
+                name="FinishWorkout"
+                component={FinishWorkoutScreen}
               />
-            </LibraryStack.Navigator>
+            </ActiveWorkoutStack.Navigator>
           )}
-        </Tab.Screen>
-        <Tab.Screen name="BuildTab">
-          {() => (
-            <BuildStack.Navigator>
-              <BuildStack.Screen
-                name="BuildStart"
-                component={BuildStartScreen}
-              />
-              <BuildStack.Screen
-                name="SelectSourceWorkout"
-                component={SelectSourceWorkoutScreen}
-              />
-              <BuildStack.Screen
-                name="SourceWorkoutDetail"
-                component={SourceWorkoutDetailScreen}
-              />
-              <BuildStack.Screen
-                name="BuildWorkout"
-                component={BuildWorkoutScreen}
-              />
-              <BuildStack.Screen
-                name="SelectExerciseForBuild"
-                component={SelectExerciseForBuildScreen}
-              />
-              <BuildStack.Screen
-                name="ExerciseDetailForBuild"
-                component={ExerciseDetailForBuildScreen}
-              />
-            </BuildStack.Navigator>
-          )}
-        </Tab.Screen>
-      </Tab.Navigator>
+        </Root.Screen>
+      </Root.Navigator>
     </NavigationContainer>
   );
 }
