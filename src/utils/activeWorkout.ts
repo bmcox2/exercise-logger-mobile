@@ -20,7 +20,9 @@ export type ActiveWorkoutAction =
   | { type: "DELETE_SET" }
   | { type: "DELETE_EXERCISE" }
   | { type: "REPLACE_ALL_EXERCISE"; exercise: ExerciseLibraryRow }
-  | { type: "REPLACE_EXERCISE_AT_SET"; exercise: ExerciseLibraryRow };
+  | { type: "REPLACE_EXERCISE_AT_SET"; exercise: ExerciseLibraryRow }
+  | { type: "ADD_EXERCISE"; exercise: ExerciseLibraryRow }
+  | { type: "UPDATE_SET_NOTE"; note: string | null };
 
 function toActiveWorkoutSet(set: WorkoutSet): ActiveWorkoutSet {
   return {
@@ -32,6 +34,7 @@ function toActiveWorkoutSet(set: WorkoutSet): ActiveWorkoutSet {
     plannedWeight: set.weight,
     actualWeight: set.weight,
     done: false,
+    note: set.note,
   };
 }
 
@@ -64,6 +67,7 @@ function buildActiveWorkoutSet(
     plannedWeight,
     actualWeight: plannedWeight,
     done: false,
+    note: null,
   };
 }
 
@@ -183,7 +187,10 @@ function removeExerciseAndRenumber(
   return {
     ...workout,
     exercises,
-    currentOrderIndex: Math.min(workout.currentOrderIndex, Math.max(total - 1, 0)),
+    currentOrderIndex: Math.min(
+      workout.currentOrderIndex,
+      Math.max(total - 1, 0),
+    ),
   };
 }
 
@@ -199,6 +206,14 @@ export function activeWorkoutReducer(
           ...set,
           [action.field]: action.value,
           done: false,
+        })),
+      };
+    case "UPDATE_SET_NOTE":
+      return {
+        ...workout,
+        exercises: updateCurrentSet(workout, (set) => ({
+          ...set,
+          note: action.note,
         })),
       };
     case "COMPLETE_SET": {
@@ -375,12 +390,6 @@ export function activeWorkoutReducer(
       const remainingSets = renumberSets(
         exercise.sets.filter((_, i) => i !== setIndexInExercise),
       );
-
-      // Fresh set, not a copy of movedSet: done/actuals belonged to the old
-      // exercise's performance and shouldn't carry over to a new movement.
-      // Reoccupies the exact vacated orderIndex - no other set's relative
-      // order changes, so currentOrderIndex (== movedSet.orderIndex) is
-      // still correct after renumbering, with no shift needed.
       const replacementSet = buildActiveWorkoutSet(
         1,
         movedSet.orderIndex,
@@ -400,6 +409,35 @@ export function activeWorkoutReducer(
 
       const exercises = renumberOrder([...updated, replacementExercise]);
       return { ...workout, exercises, currentOrderIndex: movedSet.orderIndex };
+    }
+    case "ADD_EXERCISE": {
+      const location = findSetLocation(
+        workout.exercises,
+        workout.currentOrderIndex,
+      );
+      if (!location) return workout;
+      const { exerciseIndex, setIndexInExercise } = location;
+      const currentSet =
+        workout.exercises[exerciseIndex].sets[setIndexInExercise];
+
+      const newSet = buildActiveWorkoutSet(
+        1,
+        workout.currentOrderIndex + 0.5,
+        0,
+        0,
+      );
+      const newExercise = buildActiveExerciseFromLibrary(action.exercise, [
+        newSet,
+      ]);
+      const exercises = renumberOrder([...workout.exercises, newExercise]);
+
+      return {
+        ...workout,
+        exercises,
+        currentOrderIndex: currentSet.done
+          ? workout.currentOrderIndex + 1
+          : workout.currentOrderIndex,
+      };
     }
     default:
       return workout;

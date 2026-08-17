@@ -103,6 +103,8 @@ function ActiveWorkoutEditor({
   );
 
   const [actionsVisible, setActionsVisible] = useState(false);
+  const [noteModalVisible, setNoteModalVisible] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
   const pendingPickerRef = useRef(false);
   const selectionMadeRef = useRef(false);
 
@@ -268,6 +270,28 @@ function ActiveWorkoutEditor({
     setActionsVisible(false);
   }
 
+  function handleAddExercise() {
+    openExercisePicker((item) =>
+      dispatch({ type: "ADD_EXERCISE", exercise: item }),
+    );
+  }
+
+  function handleOpenNoteEditor() {
+    setNoteDraft(set.note ?? "");
+    setActionsVisible(false);
+    setNoteModalVisible(true);
+  }
+
+  function handleSaveNote() {
+    const trimmed = noteDraft.trim();
+    dispatch({ type: "UPDATE_SET_NOTE", note: trimmed === "" ? null : trimmed });
+    setNoteModalVisible(false);
+  }
+
+  function handleCancelNote() {
+    setNoteModalVisible(false);
+  }
+
   return (
     <View style={styles.flexFill} {...panResponder.panHandlers}>
       <ScrollView style={styles.container}>
@@ -424,6 +448,11 @@ function ActiveWorkoutEditor({
             </Pressable>
 
             <Text style={styles.sheetSectionLabel}>This set</Text>
+            <Pressable style={styles.sheetRow} onPress={handleOpenNoteEditor}>
+              <Text style={styles.sheetRowText}>
+                {set.note ? "Edit note" : "Write note"}
+              </Text>
+            </Pressable>
             <Pressable
               style={styles.sheetRow}
               onPress={handleReplaceExerciseAtSet}
@@ -438,12 +467,50 @@ function ActiveWorkoutEditor({
               </Text>
             </Pressable>
 
+            <Pressable style={styles.sheetRow} onPress={handleAddExercise}>
+              <Text style={styles.sheetRowText}>Add exercise</Text>
+            </Pressable>
+
             <Pressable
               style={[styles.sheetRow, styles.sheetRowLast]}
               onPress={handleAddSet}
             >
               <Text style={styles.sheetRowText}>Add set</Text>
             </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={noteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCancelNote}
+      >
+        <Pressable style={styles.noteBackdrop} onPress={handleCancelNote}>
+          <Pressable style={styles.noteCard} onPress={() => {}}>
+            <Text style={styles.noteTitle}>Note for this set</Text>
+            <TextInput
+              style={styles.noteInput}
+              value={noteDraft}
+              onChangeText={setNoteDraft}
+              placeholder="e.g. machine was taken, subbed dumbbells"
+              placeholderTextColor="#999"
+              multiline
+              numberOfLines={4}
+              autoFocus
+            />
+            <View style={styles.noteActions}>
+              <Pressable
+                style={styles.noteCancelButton}
+                onPress={handleCancelNote}
+              >
+                <Text style={styles.noteCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.noteSaveButton} onPress={handleSaveNote}>
+                <Text style={styles.noteSaveText}>Save</Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -695,5 +762,58 @@ const styles = StyleSheet.create({
   },
   sheetRowTextDisabled: {
     color: "#ccc",
+  },
+  noteBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  noteCard: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+  },
+  noteTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    minHeight: 100,
+    textAlignVertical: "top",
+    backgroundColor: "#f9f9f9",
+  },
+  noteActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 16,
+  },
+  noteCancelButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  noteCancelText: {
+    color: "#555",
+    fontSize: 15,
+  },
+  noteSaveButton: {
+    backgroundColor: "#007AFF",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  noteSaveText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "bold",
   },
 });

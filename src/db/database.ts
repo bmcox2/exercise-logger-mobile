@@ -16,7 +16,7 @@ import exerciseData from "../../assets/exercises.json";
 let db: SQLite.SQLiteDatabase;
 
 export async function initDatabase() {
-  db = await SQLite.openDatabaseAsync("workouts_v6.db");
+  db = await SQLite.openDatabaseAsync("workouts_v7.db");
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,6 +41,7 @@ export async function initDatabase() {
         orderIndex INTEGER NOT NULL DEFAULT 0,
         reps INTEGER NOT NULL,
         weight REAL NOT NULL,
+        note TEXT,
         FOREIGN KEY (exercise_id) REFERENCES exercises(id)
     );
 
@@ -191,12 +192,13 @@ export async function addWorkout(
       }
       for (const set of exercise.sets) {
         await db.runAsync(
-          "INSERT INTO sets (exercise_id, setNumber, reps, weight, orderIndex) VALUES (?, ?, ?, ?, ?)",
+          "INSERT INTO sets (exercise_id, setNumber, reps, weight, orderIndex, note) VALUES (?, ?, ?, ?, ?, ?)",
           exerciseId,
           set.setNumber,
           set.reps,
           set.weight,
           setOrderIndex,
+          null,
         );
         setOrderIndex++;
       }
@@ -299,22 +301,24 @@ export async function completeWorkout(
       for (const set of exercise.sets) {
         if (set.id !== undefined) {
           await db.runAsync(
-            "UPDATE sets SET reps = ?, weight = ?, exercise_id = ?, setNumber = ?, orderIndex = ? WHERE id = ?",
+            "UPDATE sets SET reps = ?, weight = ?, exercise_id = ?, setNumber = ?, orderIndex = ?, note = ? WHERE id = ?",
             set.actualReps,
             set.actualWeight,
             exerciseId,
             set.setNumber,
             set.orderIndex,
+            set.note,
             set.id,
           );
         } else {
           await db.runAsync(
-            "INSERT INTO sets (exercise_id, setNumber, reps, weight, orderIndex) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO sets (exercise_id, setNumber, reps, weight, orderIndex, note) VALUES (?, ?, ?, ?, ?, ?)",
             exerciseId,
             set.setNumber,
             set.actualReps,
             set.actualWeight,
             set.orderIndex,
+            set.note,
           );
         }
       }

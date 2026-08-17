@@ -4,6 +4,7 @@ export interface WorkoutSet {
   orderIndex: number;
   reps: number;
   weight: number;
+  note: string | null;
 }
 
 export interface Exercise {
@@ -115,6 +116,7 @@ export interface ActiveWorkoutSet extends Identifiable {
   plannedWeight: number;
   actualWeight: number | null;
   done: boolean;
+  note: string | null;
 }
 
 export interface ActiveExercise extends Identifiable {
