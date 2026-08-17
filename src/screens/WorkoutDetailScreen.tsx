@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 
 import { WorkoutsStackParamList, Workout } from "../types";
 import { getWorkoutById } from "../db/database";
+import { flattenSetsByOrder } from "../utils/workoutOrder";
 
 type Props = NativeStackScreenProps<WorkoutsStackParamList, "WorkoutDetail">;
 
@@ -47,25 +48,26 @@ export default function WorkoutDetailScreen({ route }: Props) {
         </Text>
       </View>
 
-      {workout.exercises.map((exercise) => (
-        <View key={exercise.id}>
-          <View style={styles.exerciseHeader}>
-            <Text style={styles.exerciseName}>{exercise.name}</Text>
-          </View>
-          {exercise.sets.map((set, index) => (
-            <View
-              key={set.id}
-              style={[styles.row, index % 2 === 1 && styles.rowAlt]}
-            >
+      {flattenSetsByOrder(workout.exercises).map(({ exercise, set }, index, flatSets) => {
+        const showHeader =
+          index === 0 || flatSets[index - 1].exercise.id !== exercise.id;
+        return (
+          <View key={set.id}>
+            {showHeader && (
+              <View style={styles.exerciseHeader}>
+                <Text style={styles.exerciseName}>{exercise.name}</Text>
+              </View>
+            )}
+            <View style={[styles.row, index % 2 === 1 && styles.rowAlt]}>
               <Text style={[styles.cell, styles.cellNum]}>{set.setNumber}</Text>
               <Text style={[styles.cell, styles.cellStat]}>{set.reps}</Text>
               <Text style={[styles.cell, styles.cellStat]}>
                 {set.weight} lbs
               </Text>
             </View>
-          ))}
-        </View>
-      ))}
+          </View>
+        );
+      })}
     </ScrollView>
   );
 }

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   PanResponder,
+  Modal,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useState, useEffect, useReducer, useRef } from "react";
@@ -15,29 +16,53 @@ import {
   ActiveWorkoutStackParamList,
   ActiveWorkout,
   ActiveExercise,
+  ExerciseLibraryRow,
 } from "../types";
 import { getWorkoutById, completeWorkout } from "../db/database";
 import {
   toActiveWorkout,
   activeWorkoutReducer,
-  findNonEmptyExercise,
+  flattenActiveSetsByOrder,
 } from "../utils/activeWorkout";
 
 type Props = NativeStackScreenProps<ActiveWorkoutStackParamList, "ActiveWorkout">;
+
+function toInputText(value: number | null | undefined): string {
+  return value === null || value === undefined ? "" : String(value);
+}
 
 export default function ActiveWorkoutScreen({ route, navigation }: Props) {
   const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(
     null,
   );
+  const [notFound, setNotFound] = useState(false);
   const { workoutId } = route.params;
 
   useEffect(() => {
     async function load() {
       const workout = await getWorkoutById(workoutId);
-      if (workout) setActiveWorkout(toActiveWorkout(workout));
+      if (workout) {
+        setActiveWorkout(toActiveWorkout(workout));
+      } else {
+        setNotFound(true);
+      }
     }
     load();
   }, []);
+
+  if (notFound) {
+    return (
+      <View style={styles.fallbackContainer}>
+        <Text style={styles.fallbackText}>This workout could not be found.</Text>
+        <Pressable
+          style={styles.fallbackButton}
+          onPress={() => navigation.getParent()?.goBack()}
+        >
+          <Text style={styles.fallbackButtonText}>Exit</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (!activeWorkout) {
     return (
@@ -67,6 +92,30 @@ function ActiveWorkoutEditor({
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
+  const flatSets = flattenActiveSetsByOrder(workout.exercises);
+  const current = flatSets[workout.currentOrderIndex];
+  const exercise = current?.exercise;
+  const set = current?.set;
+
+  const [repsText, setRepsText] = useState(() => toInputText(set?.actualReps));
+  const [weightText, setWeightText] = useState(() =>
+    toInputText(set?.actualWeight),
+  );
+
+  const [actionsVisible, setActionsVisible] = useState(false);
+  const pendingPickerRef = useRef(false);
+  const selectionMadeRef = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("transitionEnd", (e) => {
+      if (e.data.closing) return;
+      if (!pendingPickerRef.current) return;
+      pendingPickerRef.current = false;
+      if (!selectionMadeRef.current) setActionsVisible(true);
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) =>
@@ -82,12 +131,11 @@ function ActiveWorkoutEditor({
     }),
   ).current;
 
-  const exercise = workout.exercises[workout.currentExerciseIndex];
-  const set = exercise ? exercise.sets[exercise.currentSetIndex] : undefined;
-
   useEffect(() => {
     setAttemptedSubmit(false);
-  }, [set?.id]);
+    setRepsText(toInputText(set?.actualReps));
+    setWeightText(toInputText(set?.actualWeight));
+  }, [set?.id ?? set?.tempId]);
 
   useEffect(() => {
     if (workout.status !== "completed") return;
@@ -143,7 +191,7 @@ function ActiveWorkoutEditor({
 
   function handleDone() {
     if (!set) return;
-    if (set.actualReps === null || set.actualWeight === null) {
+    if (!set.done && (set.actualReps === null || set.actualWeight === null)) {
       setAttemptedSubmit(true);
       Alert.alert("Enter both weight and reps before finishing this set.");
       return;
@@ -151,12 +199,11 @@ function ActiveWorkoutEditor({
     dispatch({ type: "COMPLETE_SET" });
   }
 
-  const isLastSetOfExercise = exercise.currentSetIndex === exercise.sets.length - 1;
-  const nextExerciseIndex = isLastSetOfExercise
-    ? findNonEmptyExercise(workout.exercises, workout.currentExerciseIndex + 1, 1)
-    : null;
+  const canDeleteExercise = workout.exercises.length > 1;
+
+  const nextEntry = flatSets[workout.currentOrderIndex + 1];
   const nextExerciseName =
-    nextExerciseIndex !== null ? workout.exercises[nextExerciseIndex].name : null;
+    nextEntry && nextEntry.exercise !== exercise ? nextEntry.exercise.name : null;
 
   function handleExitPress() {
     Alert.alert("Exit Workout?", "Your progress will not be saved.", [
@@ -167,6 +214,58 @@ function ActiveWorkoutEditor({
         onPress: () => navigation.getParent()?.goBack(),
       },
     ]);
+  }
+
+  function openExercisePicker(onSelect: (item: ExerciseLibraryRow) => void) {
+    pendingPickerRef.current = true;
+    selectionMadeRef.current = false;
+    setActionsVisible(false);
+    navigation.navigate("SelectExerciseForActiveWorkout", {
+      onSelect: (item) => {
+        selectionMadeRef.current = true;
+        onSelect(item);
+      },
+    });
+  }
+
+  function handleReplaceExercise() {
+    openExercisePicker((item) =>
+      dispatch({ type: "REPLACE_ALL_EXERCISE", exercise: item }),
+    );
+  }
+
+  function handleDeleteExercise() {
+    Alert.alert(
+      "Delete Exercise?",
+      "This exercise and its sets will be removed from this workout.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            dispatch({ type: "DELETE_EXERCISE" });
+            setActionsVisible(false);
+          },
+        },
+      ],
+    );
+  }
+
+  function handleReplaceExerciseAtSet() {
+    openExercisePicker((item) =>
+      dispatch({ type: "REPLACE_EXERCISE_AT_SET", exercise: item }),
+    );
+  }
+
+  function handleDeleteSet() {
+    dispatch({ type: "DELETE_SET" });
+    setActionsVisible(false);
+  }
+
+  function handleAddSet() {
+    dispatch({ type: "ADD_SET" });
+    setActionsVisible(false);
   }
 
   return (
@@ -180,18 +279,17 @@ function ActiveWorkoutEditor({
         </View>
 
         <Text style={styles.progress}>
-          Exercise {workout.currentExerciseIndex + 1} of{" "}
-          {workout.exercises.length}
+          Set {workout.currentOrderIndex + 1} of {flatSets.length}
         </Text>
         <Text style={styles.exerciseName}>{exercise.name}</Text>
 
         <View style={styles.setPills}>
-          {exercise.sets.map((s, index) => (
+          {exercise.sets.map((s) => (
             <View
-              key={s.id}
+              key={s.id ?? s.tempId}
               style={[
                 styles.pill,
-                index === exercise.currentSetIndex && styles.pillCurrent,
+                s.orderIndex === workout.currentOrderIndex && styles.pillCurrent,
                 s.done && styles.pillDone,
               ]}
             >
@@ -215,8 +313,9 @@ function ActiveWorkoutEditor({
               keyboardType="numeric"
               placeholder={String(set.plannedReps)}
               placeholderTextColor="#999"
-              value={set.actualReps === null ? "" : String(set.actualReps)}
+              value={repsText}
               onChangeText={(text) => {
+                setRepsText(text);
                 const parsed = parseInt(text, 10);
                 dispatch({
                   type: "UPDATE_ACTUAL",
@@ -238,9 +337,10 @@ function ActiveWorkoutEditor({
               keyboardType="numeric"
               placeholder={String(set.plannedWeight)}
               placeholderTextColor="#999"
-              value={set.actualWeight === null ? "" : String(set.actualWeight)}
+              value={weightText}
               onChangeText={(text) => {
-                const parsed = parseInt(text, 10);
+                setWeightText(text);
+                const parsed = parseFloat(text);
                 dispatch({
                   type: "UPDATE_ACTUAL",
                   field: "actualWeight",
@@ -255,11 +355,19 @@ function ActiveWorkoutEditor({
           <Pressable style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Info</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton}>
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() => setActionsVisible(true)}
+          >
             <Text style={styles.secondaryButtonText}>Actions</Text>
           </Pressable>
-          <Pressable style={styles.doneButton} onPress={handleDone}>
-            <Text style={styles.doneButtonText}>Done</Text>
+          <Pressable
+            style={[styles.doneButton, set.done && styles.doneButtonUndo]}
+            onPress={handleDone}
+          >
+            <Text style={styles.doneButtonText}>
+              {set.done ? "Undo" : "Done"}
+            </Text>
           </Pressable>
         </View>
 
@@ -269,27 +377,94 @@ function ActiveWorkoutEditor({
           </Text>
         )}
       </ScrollView>
+
+      <Modal
+        visible={actionsVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActionsVisible(false)}
+      >
+        <Pressable
+          style={styles.sheetBackdrop}
+          onPress={() => setActionsVisible(false)}
+        >
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.sheetHeader}>
+              <View style={styles.sheetHeaderText}>
+                <Text style={styles.sheetTitle}>{exercise.name}</Text>
+                <Text style={styles.sheetSubtitle}>
+                  Set {set.setNumber} of {exercise.sets.length}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setActionsVisible(false)}
+                hitSlop={8}
+              >
+                <Text style={styles.sheetClose}>✕</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.sheetSectionLabel}>This exercise</Text>
+            <Pressable style={styles.sheetRow} onPress={handleReplaceExercise}>
+              <Text style={styles.sheetRowText}>Replace whole exercise</Text>
+            </Pressable>
+            <Pressable
+              style={styles.sheetRow}
+              onPress={handleDeleteExercise}
+              disabled={!canDeleteExercise}
+            >
+              <Text
+                style={[
+                  styles.sheetRowTextDestructive,
+                  !canDeleteExercise && styles.sheetRowTextDisabled,
+                ]}
+              >
+                Delete exercise
+              </Text>
+            </Pressable>
+
+            <Text style={styles.sheetSectionLabel}>This set</Text>
+            <Pressable
+              style={styles.sheetRow}
+              onPress={handleReplaceExerciseAtSet}
+            >
+              <Text style={styles.sheetRowText}>
+                Replace exercise for this set
+              </Text>
+            </Pressable>
+            <Pressable style={styles.sheetRow} onPress={handleDeleteSet}>
+              <Text style={styles.sheetRowTextDestructive}>
+                Delete this set
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.sheetRow, styles.sheetRowLast]}
+              onPress={handleAddSet}
+            >
+              <Text style={styles.sheetRowText}>Add set</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
 
 function ExerciseProgressBar({ exercises }: { exercises: ActiveExercise[] }) {
+  const flatSets = flattenActiveSetsByOrder(exercises);
   return (
     <View style={styles.progressBarRow}>
-      {exercises.map((ex) => {
-        const doneCount = ex.sets.filter((s) => s.done).length;
-        const fraction = ex.sets.length === 0 ? 0 : doneCount / ex.sets.length;
-        return (
-          <View key={ex.id} style={styles.progressSegmentTrack}>
-            <View
-              style={[
-                styles.progressSegmentFill,
-                { width: `${fraction * 100}%` },
-              ]}
-            />
-          </View>
-        );
-      })}
+      {flatSets.map(({ set }) => (
+        <View key={set.id ?? set.tempId} style={styles.progressSegmentTrack}>
+          <View
+            style={[
+              styles.progressSegmentFill,
+              { width: set.done ? "100%" : "0%" },
+            ]}
+          />
+        </View>
+      ))}
     </View>
   );
 }
@@ -445,6 +620,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
   },
+  doneButtonUndo: {
+    backgroundColor: "#8E8E93",
+  },
   doneButtonText: {
     color: "#fff",
     fontSize: 16,
@@ -455,5 +633,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#999",
     textAlign: "center",
+  },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  sheetHeaderText: {
+    flex: 1,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  sheetSubtitle: {
+    fontSize: 14,
+    color: "#555",
+    marginTop: 2,
+  },
+  sheetClose: {
+    fontSize: 20,
+    color: "#555",
+    paddingLeft: 12,
+  },
+  sheetSectionLabel: {
+    fontSize: 13,
+    color: "#999",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  sheetRow: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  sheetRowLast: {
+    borderBottomWidth: 0,
+    marginTop: 4,
+  },
+  sheetRowText: {
+    fontSize: 16,
+    color: "#222",
+  },
+  sheetRowTextDestructive: {
+    fontSize: 16,
+    color: "#FF3B30",
+  },
+  sheetRowTextDisabled: {
+    color: "#ccc",
   },
 });

@@ -16,7 +16,7 @@ import exerciseData from "../../assets/exercises.json";
 let db: SQLite.SQLiteDatabase;
 
 export async function initDatabase() {
-  db = await SQLite.openDatabaseAsync("workouts_v4.db");
+  db = await SQLite.openDatabaseAsync("workouts_v6.db");
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,6 +30,7 @@ export async function initDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         workout_id INTEGER NOT NULL,
         name TEXT NOT NULL,
+        orderIndex INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (workout_id) REFERENCES workouts(id)
     );
 
@@ -37,6 +38,7 @@ export async function initDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         exercise_id INTEGER NOT NULL,
         setNumber INTEGER NOT NULL,
+        orderIndex INTEGER NOT NULL DEFAULT 0,
         reps INTEGER NOT NULL,
         weight REAL NOT NULL,
         FOREIGN KEY (exercise_id) REFERENCES exercises(id)
@@ -103,14 +105,14 @@ async function getMuscles(
 
 async function getSetsForExercise(exerciseId: number): Promise<WorkoutSet[]> {
   return db.getAllAsync<WorkoutSet>(
-    "SELECT * FROM sets WHERE exercise_id = ? ORDER BY setNumber ASC",
+    "SELECT * FROM sets WHERE exercise_id = ? ORDER BY orderIndex ASC",
     exerciseId,
   );
 }
 
 async function getExercisesForWorkout(workoutId: number): Promise<Exercise[]> {
   const exerciseRows = await db.getAllAsync<Exercise>(
-    "SELECT * FROM exercises WHERE workout_id = ?",
+    "SELECT * FROM exercises WHERE workout_id = ? ORDER BY orderIndex ASC, id ASC",
     workoutId,
   );
 
@@ -158,11 +160,18 @@ export async function addWorkout(
     );
     newWorkoutId = workoutResult.lastInsertRowId;
 
-    for (const exercise of workout.exercises) {
+    let setOrderIndex = 0;
+    for (
+      let orderIndex = 0;
+      orderIndex < workout.exercises.length;
+      orderIndex++
+    ) {
+      const exercise = workout.exercises[orderIndex];
       const exerciseResult = await db.runAsync(
-        "INSERT INTO exercises (workout_id, name) VALUES (?, ?)",
+        "INSERT INTO exercises (workout_id, name, orderIndex) VALUES (?, ?, ?)",
         newWorkoutId,
         exercise.name,
+        orderIndex,
       );
       const exerciseId = exerciseResult.lastInsertRowId;
 
@@ -182,12 +191,14 @@ export async function addWorkout(
       }
       for (const set of exercise.sets) {
         await db.runAsync(
-          "INSERT INTO sets (exercise_id, setNumber, reps, weight) VALUES (?, ?, ?, ?)",
+          "INSERT INTO sets (exercise_id, setNumber, reps, weight, orderIndex) VALUES (?, ?, ?, ?, ?)",
           exerciseId,
           set.setNumber,
           set.reps,
           set.weight,
+          setOrderIndex,
         );
+        setOrderIndex++;
       }
     }
   });
@@ -199,6 +210,45 @@ export async function completeWorkout(
   durationMinutes: number,
 ): Promise<void> {
   await db.withTransactionAsync(async () => {
+    const original = await getWorkoutById(workout.id);
+    if (!original) return;
+    const originalSetIds: number[] = [];
+    for (const exercise of original.exercises) {
+      for (const set of exercise.sets) {
+        originalSetIds.push(set.id);
+      }
+    }
+
+    const currentSetIds: number[] = [];
+    for (const exercise of workout.exercises) {
+      for (const set of exercise.sets) {
+        if (set.id === undefined) continue;
+        currentSetIds.push(set.id);
+      }
+    }
+
+    for (const id of originalSetIds) {
+      if (!currentSetIds.includes(id)) {
+        await db.runAsync("DELETE FROM sets WHERE id = ?", id);
+      }
+    }
+
+    const originalExerciseIds: number[] = [];
+    for (const exercise of original.exercises) {
+      originalExerciseIds.push(exercise.id);
+    }
+
+    const currentExerciseIds: number[] = [];
+    for (const exercise of workout.exercises) {
+      if (exercise.id === undefined) continue;
+      currentExerciseIds.push(exercise.id);
+    }
+
+    for (const id of originalExerciseIds) {
+      if (!currentExerciseIds.includes(id)) {
+        await db.runAsync("DELETE FROM exercises WHERE id = ?", id);
+      }
+    }
     await db.runAsync(
       "UPDATE workouts SET durationMinutes = ?, status = ? WHERE id = ?",
       durationMinutes,
@@ -207,13 +257,66 @@ export async function completeWorkout(
     );
 
     for (const exercise of workout.exercises) {
-      for (const set of exercise.sets) {
-        await db.runAsync(
-          "UPDATE sets SET reps = ?, weight = ? WHERE id = ?",
-          set.actualReps,
-          set.actualWeight,
-          set.id,
+      if (exercise.sets.length === 0) {
+        throw new Error("completeWorkout: exercise with no sets");
+      }
+      const exerciseOrderIndex = Math.min(
+        ...exercise.sets.map((s) => s.orderIndex),
+      );
+      let exerciseId = exercise.id;
+
+      if (exerciseId === undefined) {
+        const exerciseResult = await db.runAsync(
+          "INSERT INTO exercises (workout_id, name, orderIndex) VALUES (?, ?, ?)",
+          workout.id,
+          exercise.name,
+          exerciseOrderIndex,
         );
+        exerciseId = exerciseResult.lastInsertRowId;
+
+        for (const muscle of exercise.primaryMuscles) {
+          await db.runAsync(
+            "INSERT INTO primaryMuscles (exercise_id, muscle) VALUES (?, ?)",
+            exerciseId,
+            muscle,
+          );
+        }
+        for (const muscle of exercise.secondaryMuscles) {
+          await db.runAsync(
+            "INSERT INTO secondaryMuscles (exercise_id, muscle) VALUES (?, ?)",
+            exerciseId,
+            muscle,
+          );
+        }
+      } else {
+        await db.runAsync(
+          "UPDATE exercises SET orderIndex = ? WHERE id = ?",
+          exerciseOrderIndex,
+          exerciseId,
+        );
+      }
+
+      for (const set of exercise.sets) {
+        if (set.id !== undefined) {
+          await db.runAsync(
+            "UPDATE sets SET reps = ?, weight = ?, exercise_id = ?, setNumber = ?, orderIndex = ? WHERE id = ?",
+            set.actualReps,
+            set.actualWeight,
+            exerciseId,
+            set.setNumber,
+            set.orderIndex,
+            set.id,
+          );
+        } else {
+          await db.runAsync(
+            "INSERT INTO sets (exercise_id, setNumber, reps, weight, orderIndex) VALUES (?, ?, ?, ?, ?)",
+            exerciseId,
+            set.setNumber,
+            set.actualReps,
+            set.actualWeight,
+            set.orderIndex,
+          );
+        }
       }
     }
   });

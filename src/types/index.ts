@@ -1,6 +1,7 @@
 export interface WorkoutSet {
   id: number;
   setNumber: number;
+  orderIndex: number;
   reps: number;
   weight: number;
 }
@@ -106,9 +107,9 @@ export type DraftAction =
       value: number;
     };
 
-export interface ActiveWorkoutSet {
-  id: number;
+export interface ActiveWorkoutSet extends Identifiable {
   setNumber: number;
+  orderIndex: number;
   plannedReps: number;
   actualReps: number | null;
   plannedWeight: number;
@@ -116,11 +117,9 @@ export interface ActiveWorkoutSet {
   done: boolean;
 }
 
-export interface ActiveExercise {
-  id: number;
+export interface ActiveExercise extends Identifiable {
   name: string;
   sets: ActiveWorkoutSet[];
-  currentSetIndex: number;
   primaryMuscles: string[];
   secondaryMuscles: string[];
 }
@@ -130,7 +129,7 @@ export interface ActiveWorkout {
   name: string;
   date: string;
   durationMinutes: number;
-  currentExerciseIndex: number;
+  currentOrderIndex: number;
   exercises: ActiveExercise[];
   status: "planned" | "completed";
 }
@@ -141,6 +140,7 @@ export type StartStackParamList = {
 
 export type ActiveWorkoutStackParamList = {
   ActiveWorkout: { workoutId: number };
+  SelectExerciseForActiveWorkout: { onSelect: (item: ExerciseLibraryRow) => void };
   FinishWorkout: undefined;
 };
 

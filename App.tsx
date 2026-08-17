@@ -17,6 +17,7 @@ import SelectExerciseForBuildScreen from "./src/screens/SelectExerciseForBuildSc
 import ExerciseDetailForBuildScreen from "./src/screens/ExerciseDetailForBuildScreen";
 import SelectPlannedWorkoutScreen from "./src/screens/SelectPlannedWorkoutScreen";
 import ActiveWorkoutScreen from "./src/screens/ActiveWorkoutScreen";
+import SelectExerciseForActiveWorkoutScreen from "./src/screens/SelectExerciseForActiveWorkoutScreen";
 import FinishWorkoutScreen from "./src/screens/FinishWorkoutScreen";
 import {
   WorkoutsStackParamList,
@@ -144,6 +145,10 @@ export default function App() {
                 name="ActiveWorkout"
                 component={ActiveWorkoutScreen}
                 initialParams={{ workoutId: route.params.workoutId }}
+              />
+              <ActiveWorkoutStack.Screen
+                name="SelectExerciseForActiveWorkout"
+                component={SelectExerciseForActiveWorkoutScreen}
               />
               <ActiveWorkoutStack.Screen
                 name="FinishWorkout"
